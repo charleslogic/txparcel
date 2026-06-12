@@ -204,6 +204,10 @@
             <input type="checkbox" id="vc-entire-street">
             Entire street
         </label>
+        <label class="vc-checkbox-label" for="vc-all-visible">
+            <input type="checkbox" id="vc-all-visible">
+            All visible parcels
+        </label>
     </div>
     <div id="map"></div>
 
@@ -468,11 +472,27 @@
         }
 
         function runValueCompare(props, layer) {
+            const requestId = ++compareRequestId;
+
+            if (document.getElementById('vc-all-visible').checked) {
+                if (!parcelLayer) return;
+
+                const visibleBounds = map.getBounds();
+                const features = [];
+                parcelLayer.eachLayer((l) => {
+                    if (!l.feature || l.feature.properties.ACCOUNT === props.ACCOUNT) return;
+                    if (!l.getBounds || !l.getBounds().intersects(visibleBounds)) return;
+                    features.push(l.toGeoJSON());
+                });
+
+                buildCompareOverlay(props, { type: 'FeatureCollection', features }, layer);
+                return;
+            }
+
             const rangeInput = document.getElementById('vc-range');
             const entireStreet = document.getElementById('vc-entire-street').checked;
             const range = Math.max(1, parseInt(rangeInput.value, 10) || 10);
             const where = buildCompareWhereClause(props, range, entireStreet);
-            const requestId = ++compareRequestId;
             const vcBtn = document.getElementById('vc-btn');
             vcBtn.classList.add('btn-loading');
 
@@ -560,9 +580,15 @@
             compareLayerGroup.addTo(map);
         }
 
-        document.getElementById('vc-entire-street').addEventListener('change', (e) => {
-            document.getElementById('vc-range').disabled = e.target.checked;
-        });
+        function updateCompareControlsState() {
+            const allVisible = document.getElementById('vc-all-visible').checked;
+            const entireStreet = document.getElementById('vc-entire-street').checked;
+            document.getElementById('vc-entire-street').disabled = allVisible;
+            document.getElementById('vc-range').disabled = allVisible || entireStreet;
+        }
+
+        document.getElementById('vc-entire-street').addEventListener('change', updateCompareControlsState);
+        document.getElementById('vc-all-visible').addEventListener('change', updateCompareControlsState);
 
         function toggleValueCompare() {
             valueCompareActive = !valueCompareActive;
