@@ -477,11 +477,9 @@
             if (document.getElementById('vc-all-visible').checked) {
                 if (!parcelLayer) return;
 
-                const visibleBounds = map.getBounds();
                 const features = [];
-                parcelLayer.eachLayer((l) => {
-                    if (!l.feature || l.feature.properties.ACCOUNT === props.ACCOUNT) return;
-                    if (!l.getBounds || !l.getBounds().intersects(visibleBounds)) return;
+                parcelLayer.eachActiveFeature((l) => {
+                    if (l.feature.properties.ACCOUNT === props.ACCOUNT) return;
                     features.push(l.toGeoJSON());
                 });
 
