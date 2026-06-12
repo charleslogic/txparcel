@@ -215,7 +215,12 @@
         // 1. TARRANT COUNTY CONFIG
         const TARRANT_URL = 'https://mapit.tarrantcounty.com/arcgis/rest/services/Dynamic/TADParcels/MapServer/0';
         const PARCEL_MIN_ZOOM = 16;
-        const queryFields = ['OBJECTID', 'ACCOUNT', 'OWNER_NAME', 'SITUS_ADDR', 'STREET_NO', 'STREET_NAM', 'STREET_TYP', 'TOTAL_VALU', 'LAND_ACRES'];
+        const queryFields = [
+            'OBJECTID', 'ACCOUNT', 'OWNER_NAME', 'SITUS_ADDR', 'STREET_NO', 'STREET_NAM', 'STREET_TYP',
+            'TOTAL_VALU', 'LAND_VALUE', 'IMPR_VALUE', 'APPRAISEDV',
+            'LAND_ACRES', 'LAND_SQFT', 'YEAR_BUILT', 'LIVING_ARE', 'BEDROOMS', 'BATHROOMS', 'GARAGE_CAP',
+            'SW_POOL', 'CENTRAL_HE', 'CENTRAL_AI', 'SubdivisionName', 'SCHOOL', 'EXEMPTION_', 'DEED_DATE'
+        ];
         const getDetailLink = (acc) => `https://tarrant.prodigycad.com/property-detail/${acc}`;
 
         const baseLayers = [
@@ -238,11 +243,94 @@
         let compareRequestId = 0;
 
         // 2. POPUPS
+        function fmtMoney(n) {
+            return `$${Math.round(Number(n) || 0).toLocaleString()}`;
+        }
+
+        function fmtDate(ms) {
+            if (!ms) return null;
+            const d = new Date(Number(ms));
+            if (isNaN(d.getTime())) return null;
+            return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+
+        function popupRow(label, value) {
+            if (value === null || value === undefined || value === '') return '';
+            return `<tr><td><b>${label}:</b></td><td>${value}</td></tr>`;
+        }
+
+        // Builds the "extra" detail rows shared by both popups, omitting any
+        // field that is blank/zero in the source data.
+        function buildDetailRows(props) {
+            const rows = [];
+
+            const acres = Number(props.LAND_ACRES) || 0;
+            const lotSqft = Number(props.LAND_SQFT) || 0;
+            if (acres > 0 || lotSqft > 0) {
+                const parts = [];
+                if (acres > 0) parts.push(`${acres} ac`);
+                if (lotSqft > 0) parts.push(`${Math.round(lotSqft).toLocaleString()} sqft`);
+                rows.push(popupRow('Lot Size', parts.join(' / ')));
+            }
+
+            const yearBuilt = Number(props.YEAR_BUILT) || 0;
+            if (yearBuilt > 0) rows.push(popupRow('Year Built', yearBuilt));
+
+            const livingArea = Number(props.LIVING_ARE) || 0;
+            if (livingArea > 0) {
+                rows.push(popupRow('Living Area', `${Math.round(livingArea).toLocaleString()} sqft`));
+                const totalValue = Number(props.TOTAL_VALU) || 0;
+                if (totalValue > 0) {
+                    rows.push(popupRow('$/sqft', fmtMoney(totalValue / livingArea)));
+                }
+            }
+
+            const beds = Number(props.BEDROOMS) || 0;
+            const baths = Number(props.BATHROOMS) || 0;
+            if (beds > 0 || baths > 0) {
+                rows.push(popupRow('Beds / Baths', `${beds || '-'} / ${baths || '-'}`));
+            }
+
+            const garage = Number(props.GARAGE_CAP) || 0;
+            if (garage > 0) rows.push(popupRow('Garage', `${garage}-car`));
+
+            const features = [];
+            if (String(props.SW_POOL || '').trim().toUpperCase() === 'X') features.push('Pool');
+            if (String(props.CENTRAL_HE || '').trim().toUpperCase() === 'Y') features.push('Central Heat');
+            if (String(props.CENTRAL_AI || '').trim().toUpperCase() === 'Y') features.push('Central Air');
+            if (features.length) rows.push(popupRow('Features', features.join(', ')));
+
+            const landValue = Number(props.LAND_VALUE) || 0;
+            const imprValue = Number(props.IMPR_VALUE) || 0;
+            if (landValue > 0 || imprValue > 0) {
+                rows.push(popupRow('Land / Improvement', `${fmtMoney(landValue)} / ${fmtMoney(imprValue)}`));
+            }
+
+            const appraisedV = Number(props.APPRAISEDV) || 0;
+            const totalValue = Number(props.TOTAL_VALU) || 0;
+            if (appraisedV > 0 && Math.round(appraisedV) !== Math.round(totalValue)) {
+                rows.push(popupRow('Capped Value', fmtMoney(appraisedV)));
+            }
+
+            const subdivision = String(props.SubdivisionName || '').trim();
+            if (subdivision) rows.push(popupRow('Subdivision', subdivision));
+
+            const school = String(props.SCHOOL || '').trim();
+            if (school) rows.push(popupRow('School District', school));
+
+            const exemption = String(props.EXEMPTION_ || '').trim();
+            if (exemption) rows.push(popupRow('Exemption', exemption));
+
+            const lastSale = fmtDate(props.DEED_DATE);
+            if (lastSale) rows.push(popupRow('Last Sale', lastSale));
+
+            return rows.join('');
+        }
+
         function buildParcelPopup(props) {
             const owner = props.OWNER_NAME || 'N/A';
             const account = props.ACCOUNT || 'N/A';
             const addr = props.SITUS_ADDR || 'N/A';
-            const acres = props.LAND_ACRES || '0';
             const totalValue = Number(props.TOTAL_VALU) || 0;
 
             return `<div class="parcel-popup">
@@ -250,8 +338,8 @@
                 <small style="color:#666;">${addr}</small><br>
                 <table style="width:100%; font-size:13px; margin-top:8px; border-top: 1px solid #eee; padding-top:5px;">
                     <tr><td><b>Acct:</b></td><td>${account}</td></tr>
-                    <tr><td><b>Acres:</b></td><td>${acres}</td></tr>
-                    <tr><td><b>Total Value:</b></td><td>$${totalValue.toLocaleString()}</td></tr>
+                    ${buildDetailRows(props)}
+                    <tr><td><b>Total Value:</b></td><td>${fmtMoney(totalValue)}</td></tr>
                 </table>
                 <a href="${getDetailLink(account)}" target="_blank" class="action-link">View Details</a>
             </div>`;
@@ -275,7 +363,8 @@
                 <small style="color:#666;">${addr}</small><br>
                 <table style="width:100%; font-size:13px; margin-top:8px; border-top: 1px solid #eee; padding-top:5px;">
                     <tr><td><b>Acct:</b></td><td>${account}</td></tr>
-                    <tr><td><b>Total Value:</b></td><td>$${totalValue.toLocaleString()}</td></tr>
+                    ${buildDetailRows(props)}
+                    <tr><td><b>Total Value:</b></td><td>${fmtMoney(totalValue)}</td></tr>
                     <tr><td><b>vs. Selected:</b></td><td style="color:${deltaColor}; font-weight:bold;">${deltaStr}</td></tr>
                 </table>
                 <a href="${getDetailLink(account)}" target="_blank" class="action-link">View Details</a>
@@ -328,7 +417,7 @@
                 zoomDiv.innerHTML = `Zoom: ${map.getZoom()} (Load error)`;
             });
 
-            parcelLayer.bindPopup((l) => buildParcelPopup(l.feature.properties));
+            parcelLayer.bindPopup((l) => buildParcelPopup(l.feature.properties), { maxHeight: 320 });
             parcelLayer.on('click', onParcelClick);
 
             parcelLayer.addTo(map);
@@ -455,7 +544,7 @@
                     const val = Number(feature.properties.TOTAL_VALU) || 0;
                     const delta = val - selectedValue;
 
-                    layer.bindPopup(buildComparePopup(feature.properties, delta));
+                    layer.bindPopup(buildComparePopup(feature.properties, delta), { maxHeight: 320 });
 
                     const label = L.marker(layer.getBounds().getCenter(), {
                         icon: L.divIcon({ className: 'vc-delta-label', html: formatDelta(delta), iconSize: null }),
