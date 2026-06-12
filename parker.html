@@ -60,6 +60,10 @@
             animation: spin 1s linear infinite !important;
         }
 
+        .control-hidden {
+            display: none !important;
+        }
+
         @keyframes pulse-glow {
 
             0%,
@@ -366,10 +370,14 @@
                 refreshValueLabels();
                 btn.classList.remove('btn-active');
                 btn.innerHTML = '📋';
+                document.getElementById('vc-btn').classList.add('control-hidden');
+                document.getElementById('values-btn').classList.add('control-hidden');
                 return;
             }
 
             btn.classList.add('btn-active');
+            document.getElementById('vc-btn').classList.remove('control-hidden');
+            document.getElementById('values-btn').classList.remove('control-hidden');
             refreshParcelLayer();
         }
 
@@ -540,12 +548,12 @@
                 tadBtn.innerHTML = '📋';
                 tadBtn.onclick = (e) => { e.preventDefault(); toggleParcels(); };
 
-                const vcBtn = L.DomUtil.create('a', 'custom-control-btn', container);
+                const vcBtn = L.DomUtil.create('a', 'custom-control-btn control-hidden', container);
                 vcBtn.id = "vc-btn";
                 vcBtn.innerHTML = '⚖️';
                 vcBtn.onclick = (e) => { e.preventDefault(); toggleValueCompare(); };
 
-                const valuesBtn = L.DomUtil.create('a', 'custom-control-btn', container);
+                const valuesBtn = L.DomUtil.create('a', 'custom-control-btn control-hidden', container);
                 valuesBtn.id = "values-btn";
                 valuesBtn.innerHTML = '💰';
                 valuesBtn.onclick = (e) => { e.preventDefault(); toggleShowValues(); };
