@@ -142,15 +142,51 @@
             color: #2563eb;
             border-bottom: 1px dotted #ccc;
         }
+
+        .search-panel {
+            position: absolute;
+            left: 15px;
+            top: 15px;
+            z-index: 1001;
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            padding: 10px;
+            background: rgba(255,255,255,0.95);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            max-width: calc(100% - 30px);
+            width: 420px;
+            backdrop-filter: blur(8px);
+        }
+
+        .search-panel input {
+            flex: 1;
+            min-width: 0;
+            padding: 12px 14px;
+            border: 1px solid #cbd5e1;
+            border-radius: 14px;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .search-panel input:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 4px rgba(37,99,235,0.12);
+        }
     </style>
 </head>
 
 <body>
 
+    <div class="search-panel">
+        <input id="searchInput" type="search" placeholder="GPS, street, city, park, landmark" aria-label="Search location" />
+        <button class="icon-btn" id="searchBtn" title="Search">🔍</button>
+    </div>
+
     <div class="ui-panel">
         <button class="icon-btn" onclick="map.zoomIn()">➕</button>
         <button class="icon-btn" onclick="map.zoomOut()">➖</button>
-        <button class="icon-btn" title="Search">🔍</button>
         <button class="icon-btn" id="gpsBtn" title="Locate Me">🎯</button>
         <button class="icon-btn" id="satBtn" title="Satellite">🛰️</button>
         <button class="icon-btn" id="parcelBtn" title="Ownership Data">📋</button>
@@ -238,6 +274,94 @@
         map.on('locationfound', (e) => {
             if (userPin) map.removeLayer(userPin);
             userPin = L.marker(e.latlng).addTo(map).bindPopup("Current Location").openPopup();
+        });
+
+        const searchInput = document.getElementById('searchInput');
+        const searchBtn = document.getElementById('searchBtn');
+        let searchMarker;
+
+        function showSearchError(message) {
+            const popup = L.popup({ closeButton: true, autoClose: true })
+                .setLatLng(map.getCenter())
+                .setContent(`<div style="font-size:14px;color:#333;">${message}</div>`)
+                .openOn(map);
+            setTimeout(() => map.closePopup(popup), 3000);
+        }
+
+        function geocodeQuery(query) {
+            const encoded = encodeURIComponent(query.trim());
+            const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&q=${encoded}&limit=5`;
+
+            searchBtn.disabled = true;
+            searchBtn.textContent = '⏳';
+
+            fetch(url, {
+                headers: {
+                    'Accept': 'application/json',
+                    'User-Agent': 'txparcel.charleslogic.com'
+                }
+            })
+                .then(res => res.json())
+                .then(results => {
+                    searchBtn.disabled = false;
+                    searchBtn.textContent = '🔍';
+
+                    if (!results || !results.length) {
+                        showSearchError('No location found. Try a full address, city, state, landmark, or GPS coordinates.');
+                        return;
+                    }
+
+                    const best = results[0];
+                    const lat = parseFloat(best.lat);
+                    const lon = parseFloat(best.lon);
+
+                    if (searchMarker) map.removeLayer(searchMarker);
+                    searchMarker = L.marker([lat, lon]).addTo(map);
+
+                    const label = best.display_name || query;
+                    searchMarker.bindPopup(`<b>Search result</b><br>${label}`).openPopup();
+                    map.setView([lat, lon], 16);
+                })
+                .catch((err) => {
+                    searchBtn.disabled = false;
+                    searchBtn.textContent = '🔍';
+                    console.error('Geocode error', err);
+                    showSearchError('Search failed. Please try again.');
+                });
+        }
+
+        function parseGpsCoordinates(value) {
+            const gps = value.trim();
+            const gpsPattern = /^\s*([+-]?\d+(?:\.\d+)?)\s*,\s*([+-]?\d+(?:\.\d+)?)\s*$/;
+            const match = gpsPattern.exec(gps);
+            if (!match) return null;
+            const lat = parseFloat(match[1]);
+            const lon = parseFloat(match[2]);
+            if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+            return { lat, lon };
+        }
+
+        function runSearch() {
+            const query = searchInput.value;
+            if (!query.trim()) {
+                searchInput.focus();
+                return;
+            }
+
+            const coords = parseGpsCoordinates(query);
+            if (coords) {
+                if (searchMarker) map.removeLayer(searchMarker);
+                searchMarker = L.marker([coords.lat, coords.lon]).addTo(map);
+                searchMarker.bindPopup(`<b>GPS Coordinates</b><br>${coords.lat.toFixed(6)}, ${coords.lon.toFixed(6)}`).openPopup();
+                map.setView([coords.lat, coords.lon], 16);
+            } else {
+                geocodeQuery(query);
+            }
+        }
+
+        searchBtn.onclick = runSearch;
+        searchInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') runSearch();
         });
 
         // 3. Click-to-fetch parcel record
