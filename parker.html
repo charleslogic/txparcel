@@ -563,7 +563,6 @@
         });
         map.addControl(new FieldControls());
 
-        map.locate({ setView: true, maxZoom: 18 });
         let userMarker;
         map.on('locationfound', (e) => {
             if (userMarker) userMarker.setLatLng(e.latlng);
