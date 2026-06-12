@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Land Owner">
+    <link rel="apple-touch-icon" href="TEX.png">
+    <title>Texas Land Map Pro v1.9</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: -apple-system, sans-serif;
+            background: #e0e0e0;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+
+        .ui-panel {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .icon-btn {
+            width: 58px;
+            height: 58px;
+            background: white;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            border: none;
+            font-size: 26px;
+            transition: box-shadow 0.2s, background 0.2s, border 0.2s;
+        }
+
+        .icon-btn:active {
+            transform: scale(0.92);
+        }
+
+        /* Active state: steady amber glow when overlay is ON */
+        .active-mode {
+            border: 3px solid #f59e0b;
+            background: #fffbeb;
+            box-shadow: 0 0 14px rgba(251, 191, 36, 0.7), 0 4px 10px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Tile-loading pulse: button breathes while WMS tiles are fetching.
+           No rotation — tiles load progressively, not as a single spinner moment. */
+        @keyframes glowPulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 8px rgba(251, 191, 36, 0.5), 0 4px 10px rgba(0, 0, 0, 0.15);
+            }
+
+            50% {
+                box-shadow: 0 0 28px rgba(251, 191, 36, 1.0), 0 4px 10px rgba(0, 0, 0, 0.15);
+            }
+        }
+
+        /* Record-fetch spin: rotates while waiting for GetFeatureInfo click response */
+        @keyframes glowSpin {
+            0% {
+                transform: rotate(0deg);
+                box-shadow: 0 0 8px #fbbf24;
+            }
+
+            50% {
+                box-shadow: 0 0 22px #fbbf24;
+                background: #fffbeb;
+            }
+
+            100% {
+                transform: rotate(360deg);
+                box-shadow: 0 0 8px #fbbf24;
+            }
+        }
+
+        .tile-loading {
+            animation: glowPulse 0.9s ease-in-out infinite;
+            border: 3px solid #f59e0b;
+            background: #fffbeb;
+        }
+
+        .fetching {
+            animation: glowSpin 0.8s linear infinite;
+            border: 3px solid #f59e0b;
+        }
+
+        /* Server error state: red pulse when tiles repeatedly fail */
+        @keyframes errorPulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 8px rgba(239, 68, 68, 0.5), 0 4px 10px rgba(0, 0, 0, 0.15);
+            }
+
+            50% {
+                box-shadow: 0 0 22px rgba(239, 68, 68, 0.9), 0 4px 10px rgba(0, 0, 0, 0.15);
+            }
+        }
+
+        .tile-error {
+            animation: errorPulse 1.2s ease-in-out infinite;
+            border: 3px solid #ef4444;
+            background: #fff5f5;
+        }
+
+        /* Bolder, Darker Parcel Lines */
+        .bold-parcels {
+            filter: contrast(200%) brightness(0.7) saturate(1.8);
+            pointer-events: none;
+        }
+
+        .parcel-popup {
+            min-width: 250px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .parcel-popup h4 {
+            margin: 0 0 8px 0;
+            color: #2563eb;
+            border-bottom: 1px dotted #ccc;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="ui-panel">
+        <button class="icon-btn" onclick="map.zoomIn()">➕</button>
+        <button class="icon-btn" onclick="map.zoomOut()">➖</button>
+        <button class="icon-btn" title="Search">🔍</button>
+        <button class="icon-btn" id="gpsBtn" title="Locate Me">🎯</button>
+        <button class="icon-btn" id="satBtn" title="Satellite">🛰️</button>
+        <button class="icon-btn" id="parcelBtn" title="Ownership Data">📋</button>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // 1. Setup Layers
+        const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+        const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
+
+        const map = L.map('map', { zoomControl: false }).setView([32.7357, -97.1081], 16);
+        osm.addTo(map);
+
+        const wmsUrl = "https://feature.geographic.texas.gov/arcgis/services/Parcels/stratmap_land_parcels_48_most_recent/MapServer/WMSServer";
+        const parcelLayer = L.tileLayer.wms(wmsUrl, {
+            layers: '0',
+            format: 'image/png',
+            transparent: true,
+            version: '1.1.1',
+            className: 'bold-parcels'
+        });
+
+        // 2. UI Controls
+        const parcelBtn = document.getElementById('parcelBtn');
+        const satBtn = document.getElementById('satBtn');
+        const gpsBtn = document.getElementById('gpsBtn');
+        let parcelsOn = false;
+
+        // --- Wire up tile-loading events on the WMS layer ---
+        let tileErrorCount = 0;
+        const ERROR_THRESHOLD = 3; // failures before showing error state
+
+        parcelLayer.on('loading', () => {
+            tileErrorCount = 0;
+            parcelBtn.classList.remove('active-mode', 'tile-error');
+            parcelBtn.classList.add('tile-loading');
+            parcelBtn.title = "Loading parcel data…";
+        });
+
+        parcelLayer.on('tileerror', () => {
+            tileErrorCount++;
+            if (tileErrorCount >= ERROR_THRESHOLD) {
+                parcelBtn.classList.remove('tile-loading');
+                parcelBtn.classList.add('tile-error');
+                parcelBtn.title = "Parcel server unavailable — tap to retry";
+            }
+        });
+
+        parcelLayer.on('load', () => {
+            tileErrorCount = 0;
+            parcelBtn.classList.remove('tile-loading', 'tile-error');
+            if (parcelsOn) parcelBtn.classList.add('active-mode');
+            parcelBtn.title = "Ownership Data";
+        });
+
+        satBtn.onclick = () => {
+            if (map.hasLayer(osm)) {
+                map.removeLayer(osm); sat.addTo(map); satBtn.classList.add('active-mode');
+            } else {
+                map.removeLayer(sat); osm.addTo(map); satBtn.classList.remove('active-mode');
+            }
+        };
+
+        parcelBtn.onclick = () => {
+            if (!parcelsOn) {
+                parcelLayer.addTo(map);
+                // tile-loading event takes over immediately on add;
+                // on retry from error state, reset error class first
+                parcelBtn.classList.remove('tile-error');
+            } else {
+                map.removeLayer(parcelLayer);
+                parcelBtn.classList.remove('active-mode', 'tile-loading', 'tile-error');
+                parcelBtn.title = "Ownership Data";
+            }
+            parcelsOn = !parcelsOn;
+        };
+
+        // GPS
+        let userPin;
+        gpsBtn.onclick = () => map.locate({ setView: true, maxZoom: 17 });
+        map.on('locationfound', (e) => {
+            if (userPin) map.removeLayer(userPin);
+            userPin = L.marker(e.latlng).addTo(map).bindPopup("Current Location").openPopup();
+        });
+
+        // 3. Click-to-fetch parcel record
+        map.on('click', function (e) {
+            if (!parcelsOn) return;
+
+            // Spin the button while waiting for the GetFeatureInfo response
+            parcelBtn.classList.remove('active-mode', 'tile-loading', 'tile-error');
+            parcelBtn.classList.add('fetching');
+
+            const size = map.getSize();
+            const bbox = map.getBounds().toBBoxString();
+            const x = Math.floor(map.latLngToContainerPoint(e.latlng).x);
+            const y = Math.floor(map.latLngToContainerPoint(e.latlng).y);
+
+            // FIX: INFO_FORMAT corrected to text/xml — the server returns XML (<FIELDS>), not JSON.
+            const infoUrl = `${wmsUrl}?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetFeatureInfo&LAYERS=0&QUERY_LAYERS=0&BBOX=${bbox}&FEATURE_COUNT=1&HEIGHT=${size.y}&WIDTH=${size.x}&FORMAT=image/png&INFO_FORMAT=text/xml&SRS=EPSG:4326&X=${x}&Y=${y}`;
+
+            fetch(infoUrl)
+                .then(res => res.text())
+                .then(text => {
+                    parcelBtn.classList.remove('fetching');
+                    // Restore steady active glow now that fetch is done
+                    if (parcelsOn) parcelBtn.classList.add('active-mode');
+
+                    if (text.includes('<FIELDS')) {
+                        const parser = new DOMParser();
+                        const xmlDoc = parser.parseFromString(text, "text/xml");
+                        const f = xmlDoc.getElementsByTagName("FIELDS")[0];
+
+                        const rawDate = f.getAttribute("DATE_ACQ") || "";
+                        const formattedDate = rawDate.length === 8
+                            ? `${rawDate.substring(4, 6)}/${rawDate.substring(6, 8)}/${rawDate.substring(0, 4)}`
+                            : "N/A";
+
+                        const content = `
+                            <div class="parcel-popup">
+                                <h4>Property Details</h4>
+                                <b>Owner:</b> ${f.getAttribute("OWNER_NAME")}<br>
+                                ${f.getAttribute("NAME_CARE").trim() ? `<b>Care Of:</b> ${f.getAttribute("NAME_CARE")}<br>` : ""}
+                                <b>Address:</b> ${f.getAttribute("SITUS_ADDR")}<br>
+                                <b>Legal:</b> <small>${f.getAttribute("LEGAL_DESC")}</small>
+                                <hr style="border:0; border-top: 1px solid #eee; margin: 8px 0;">
+                                <b>Area:</b> ${f.getAttribute("LEGAL_AREA")} ${f.getAttribute("LGL_AREA_UNIT")}<br>
+                                <b>Year Built:</b> ${f.getAttribute("YEAR_BUILT") || "N/A"}<br>
+                                <b>Data Date:</b> ${formattedDate}
+                                <hr style="border:0; border-top: 1px solid #eee; margin: 8px 0;">
+                                <div style="font-size:10px; color:#888;">
+                                    Source: ${f.getAttribute("SOURCE")}<br>
+                                    County: ${f.getAttribute("COUNTY")} | Tax Year: ${f.getAttribute("TAX_YEAR")}
+                                </div>
+                            </div>
+                        `;
+                        L.popup().setLatLng(e.latlng).setContent(content).openOn(map);
+                    }
+                })
+                .catch(() => {
+                    parcelBtn.classList.remove('fetching');
+                    if (parcelsOn) parcelBtn.classList.add('active-mode');
+                });
+        });
+    </script>
+</body>
+
+</html>
