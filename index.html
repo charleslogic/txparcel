@@ -394,30 +394,107 @@
                         const xmlDoc = parser.parseFromString(text, "text/xml");
                         const f = xmlDoc.getElementsByTagName("FIELDS")[0];
 
-                        const rawDate = f.getAttribute("DATE_ACQ") || "";
-                        const formattedDate = rawDate.length === 8
+                        // Returns a trimmed attribute value, or null if missing/blank
+                        const val = (attr) => {
+                            const v = f.getAttribute(attr);
+                            if (v === null) return null;
+                            const trimmed = v.trim();
+                            return trimmed ? trimmed : null;
+                        };
+
+                        // Returns a numeric attribute value, or null if missing/zero
+                        const num = (attr) => {
+                            const v = val(attr);
+                            if (v === null) return null;
+                            const n = Number(v);
+                            return (isNaN(n) || n === 0) ? null : n;
+                        };
+
+                        const currency = (n) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+
+                        // Renders "<b>label:</b> value<br>", or '' if value is missing
+                        const row = (label, value, small) =>
+                            value ? `<b>${label}:</b> ${small ? `<small>${value}</small>` : value}<br>` : '';
+
+                        // Renders a money row from a raw attribute, or '' if missing/zero
+                        const moneyRow = (label, attr) => {
+                            const n = num(attr);
+                            return n !== null ? row(label, currency(n)) : '';
+                        };
+
+                        // Renders "label1: v1 | label2: v2 ..." for whichever pairs have values
+                        const joinedRow = (...pairs) => {
+                            const parts = pairs.filter(([, v]) => v).map(([label, v]) => `${label}: ${v}`);
+                            return parts.length ? `${parts.join(' | ')}<br>` : '';
+                        };
+
+                        const rawDate = val("DATE_ACQ");
+                        const formattedDate = (rawDate && rawDate.length === 8)
                             ? `${rawDate.substring(4, 6)}/${rawDate.substring(6, 8)}/${rawDate.substring(0, 4)}`
-                            : "N/A";
+                            : null;
+
+                        // Texas Comptroller property type codes (Form 50-115 categories)
+                        const LAND_USE_LABELS = {
+                            A1: 'Residential - Single Family', A2: 'Residential - Mobile Home',
+                            B1: 'Multifamily', B2: 'Multifamily', B3: 'Multifamily', B4: 'Multifamily',
+                            C1: 'Vacant Lot/Tract', D1: 'Qualified Open-Space Land',
+                            D2: 'Improvements on Open-Space Land', E: 'Rural Land/Improvements',
+                            F1: 'Commercial', F2: 'Industrial/Manufacturing',
+                            G1: 'Oil, Gas & Mineral Reserves', J: 'Utilities',
+                            L1: 'Commercial Personal Property', M: 'Mobile Home/Personal Property',
+                            O: 'Real Property Inventory', X: 'Exempt Property'
+                        };
+                        const landUseCode = val("STAT_LAND_USE") || val("LOC_LAND_USE");
+                        const landUse = landUseCode
+                            ? (LAND_USE_LABELS[landUseCode] ? `${LAND_USE_LABELS[landUseCode]} (${landUseCode})` : landUseCode)
+                            : null;
+
+                        const legalArea = val("LEGAL_AREA");
+                        const areaStr = legalArea ? `${legalArea}${val("LGL_AREA_UNIT") ? ' ' + val("LGL_AREA_UNIT") : ''}` : null;
+
+                        const situsAddr = val("SITUS_ADDR");
+                        const mailAddr = val("MAIL_ADDR");
+
+                        // Each group renders together; empty groups (and their divider) are dropped
+                        const groups = [
+                            [
+                                row('Owner', val("OWNER_NAME")),
+                                row('Care Of', val("NAME_CARE")),
+                                row('Mailing Address', (mailAddr && mailAddr !== situsAddr) ? mailAddr : null)
+                            ],
+                            [
+                                row('Address', situsAddr),
+                                row('Legal', val("LEGAL_DESC"), true)
+                            ],
+                            [
+                                row('Land Use', landUse),
+                                row('Area', areaStr),
+                                row('Year Built', val("YEAR_BUILT"))
+                            ],
+                            [
+                                moneyRow('Market Value', 'MKT_VALUE'),
+                                moneyRow('Land Value', 'LAND_VALUE'),
+                                moneyRow('Improvement Value', 'IMP_VALUE')
+                            ]
+                        ];
+                        const sections = groups.map(rows => rows.filter(Boolean).join('')).filter(Boolean);
+
+                        const footerRows = [
+                            joinedRow(['Property ID', val("PROP_ID")], ['Geo ID', val("GEO_ID")]),
+                            row('Source', val("SOURCE")),
+                            joinedRow(['County', val("COUNTY")], ['Tax Year', val("TAX_YEAR")], ['Data Date', formattedDate])
+                        ].filter(Boolean).join('');
+
+                        const divider = '<hr style="border:0; border-top: 1px solid #eee; margin: 8px 0;">';
 
                         const content = `
                             <div class="parcel-popup">
                                 <h4>Property Details</h4>
-                                <b>Owner:</b> ${f.getAttribute("OWNER_NAME")}<br>
-                                ${f.getAttribute("NAME_CARE").trim() ? `<b>Care Of:</b> ${f.getAttribute("NAME_CARE")}<br>` : ""}
-                                <b>Address:</b> ${f.getAttribute("SITUS_ADDR")}<br>
-                                <b>Legal:</b> <small>${f.getAttribute("LEGAL_DESC")}</small>
-                                <hr style="border:0; border-top: 1px solid #eee; margin: 8px 0;">
-                                <b>Area:</b> ${f.getAttribute("LEGAL_AREA")} ${f.getAttribute("LGL_AREA_UNIT")}<br>
-                                <b>Year Built:</b> ${f.getAttribute("YEAR_BUILT") || "N/A"}<br>
-                                <b>Data Date:</b> ${formattedDate}
-                                <hr style="border:0; border-top: 1px solid #eee; margin: 8px 0;">
-                                <div style="font-size:10px; color:#888;">
-                                    Source: ${f.getAttribute("SOURCE")}<br>
-                                    County: ${f.getAttribute("COUNTY")} | Tax Year: ${f.getAttribute("TAX_YEAR")}
-                                </div>
+                                ${sections.join(divider)}
+                                ${footerRows ? `${divider}<div style="font-size:10px; color:#888;">${footerRows}</div>` : ''}
                             </div>
                         `;
-                        L.popup().setLatLng(e.latlng).setContent(content).openOn(map);
+                        L.popup({ maxWidth: 320, maxHeight: 400 }).setLatLng(e.latlng).setContent(content).openOn(map);
                     }
                 })
                 .catch(() => {
