@@ -99,7 +99,7 @@
             border: 1px solid #ddd;
         }
 
-        #vc-range-wrap {
+        #vc-mode-wrap {
             position: absolute;
             top: 70px;
             right: 15px;
@@ -119,20 +119,10 @@
             gap: 6px;
         }
 
-        #vc-range-wrap input[type="number"] {
-            width: 48px;
-            font-size: 13px;
-            padding: 2px 4px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            font-family: inherit;
-        }
-
-        #vc-range-wrap label.vc-checkbox-label {
+        #vc-mode-wrap label.vc-option-label {
             display: flex;
             align-items: center;
             gap: 4px;
-            margin-left: 6px;
             font-weight: normal;
         }
 
@@ -199,16 +189,13 @@
 <body>
 
     <div id="zoom-display">Zoom: 18</div>
-    <div id="vc-range-wrap">
-        <label for="vc-range">Compare:</label>
-        <input type="number" id="vc-range" value="10" min="1" max="50" step="1">
-        <span>houses</span>
-        <label class="vc-checkbox-label" for="vc-entire-street">
-            <input type="checkbox" id="vc-entire-street">
+    <div id="vc-mode-wrap">
+        <label class="vc-option-label" for="vc-entire-street">
+            <input type="radio" name="vc-mode" id="vc-entire-street" checked>
             Entire street
         </label>
-        <label class="vc-checkbox-label" for="vc-all-visible">
-            <input type="checkbox" id="vc-all-visible">
+        <label class="vc-option-label" for="vc-all-visible">
+            <input type="radio" name="vc-mode" id="vc-all-visible">
             All visible parcels
         </label>
     </div>
@@ -454,18 +441,10 @@
             return String(str).replace(/'/g, "''");
         }
 
-        function buildCompareWhereClause(props, range, entireStreet) {
+        function buildCompareWhereClause(props) {
             const streetNam = escapeSql(props.STREET_NAM || '');
             const streetTyp = escapeSql(props.STREET_TYP || '');
-            let where = `STREET_NAM = '${streetNam}' AND STREET_TYP = '${streetTyp}' AND ACCOUNT <> '${escapeSql(props.ACCOUNT)}'`;
-
-            if (!entireStreet) {
-                const lo = Number(props.STREET_NO) - range * 2;
-                const hi = Number(props.STREET_NO) + range * 2;
-                where += ` AND STREET_NO BETWEEN ${lo} AND ${hi}`;
-            }
-
-            return where;
+            return `STREET_NAM = '${streetNam}' AND STREET_TYP = '${streetTyp}' AND ACCOUNT <> '${escapeSql(props.ACCOUNT)}'`;
         }
 
         function onParcelClick(e) {
@@ -490,10 +469,7 @@
                 return;
             }
 
-            const rangeInput = document.getElementById('vc-range');
-            const entireStreet = document.getElementById('vc-entire-street').checked;
-            const range = Math.max(1, parseInt(rangeInput.value, 10) || 10);
-            const where = buildCompareWhereClause(props, range, entireStreet);
+            const where = buildCompareWhereClause(props);
             const vcBtn = document.getElementById('vc-btn');
             vcBtn.classList.add('btn-loading');
 
@@ -581,27 +557,17 @@
             compareLayerGroup.addTo(map);
         }
 
-        function updateCompareControlsState() {
-            const allVisible = document.getElementById('vc-all-visible').checked;
-            const entireStreet = document.getElementById('vc-entire-street').checked;
-            document.getElementById('vc-entire-street').disabled = allVisible;
-            document.getElementById('vc-range').disabled = allVisible || entireStreet;
-        }
-
-        document.getElementById('vc-entire-street').addEventListener('change', updateCompareControlsState);
-        document.getElementById('vc-all-visible').addEventListener('change', updateCompareControlsState);
-
         function toggleValueCompare() {
             valueCompareActive = !valueCompareActive;
             const btn = document.getElementById('vc-btn');
-            const rangeWrap = document.getElementById('vc-range-wrap');
+            const modeWrap = document.getElementById('vc-mode-wrap');
 
             if (valueCompareActive) {
                 btn.classList.add('btn-active');
-                rangeWrap.style.display = 'flex';
+                modeWrap.style.display = 'flex';
             } else {
                 btn.classList.remove('btn-active');
-                rangeWrap.style.display = 'none';
+                modeWrap.style.display = 'none';
                 clearCompareOverlay();
             }
         }
