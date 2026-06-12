@@ -428,6 +428,42 @@
                             return parts.length ? `${parts.join(' | ')}<br>` : '';
                         };
 
+                        // North Texas appraisal districts with a known property-search page.
+                        // Dallas additionally supports a direct per-record deep link via PROP_ID.
+                        const CAD_LINKS = {
+                            TARRANT: { name: 'Tarrant Appraisal District', url: 'https://tarrant.prodigycad.com/property-search' },
+                            DALLAS: {
+                                name: 'Dallas CAD',
+                                url: 'https://www.dallascad.org/SearchAcct.aspx',
+                                detailUrl: (propId) => `https://www.dallascad.org/acctDetailRes.aspx?ID=${encodeURIComponent(propId)}`
+                            },
+                            DENTON: { name: 'Denton Central Appraisal District', url: 'https://www.dentoncad.com/property-search' },
+                            COLLIN: { name: 'Collin Central Appraisal District', url: 'https://collincad.org/property-search/' },
+                            JOHNSON: { name: 'Johnson County Appraisal District', url: 'https://esearch.johnsoncad.com/' },
+                            WISE: { name: 'Wise County Appraisal District', url: 'https://esearch.wise-cad.com/' },
+                            ELLIS: { name: 'Ellis Appraisal District', url: 'https://www.elliscad.com/property-search' },
+                            ROCKWALL: { name: 'Rockwall Central Appraisal District', url: 'https://www.rockwallcad.com/property-search' },
+                            KAUFMAN: { name: 'Kaufman Central Appraisal District', url: 'https://esearch.kaufman-cad.org/' },
+                            HUNT: { name: 'Hunt County Appraisal District', url: 'https://hunt-cad.org/property-search/' }
+                        };
+
+                        // Returns { label, url } for a link to the appraisal district for this parcel's county.
+                        // Known counties link to a direct record (if supported) or the CAD's search page;
+                        // unknown counties fall back to a Google search so every parcel still gets a link.
+                        const cadLink = (county, propId) => {
+                            if (!county) return null;
+                            const entry = CAD_LINKS[county.toUpperCase()];
+                            if (entry) {
+                                if (entry.detailUrl && propId) {
+                                    return { label: `View record on ${entry.name} ↗`, url: entry.detailUrl(propId) };
+                                }
+                                return { label: `Search ${entry.name} ↗`, url: entry.url };
+                            }
+                            const titleCase = (s) => s.replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+                            const query = encodeURIComponent(`${county} County Texas Appraisal District property search`);
+                            return { label: `Search ${titleCase(county)} County Appraisal District ↗`, url: `https://www.google.com/search?q=${query}` };
+                        };
+
                         const rawDate = val("DATE_ACQ");
                         const formattedDate = (rawDate && rawDate.length === 8)
                             ? `${rawDate.substring(4, 6)}/${rawDate.substring(6, 8)}/${rawDate.substring(0, 4)}`
@@ -485,13 +521,17 @@
                             joinedRow(['County', val("COUNTY")], ['Tax Year', val("TAX_YEAR")], ['Data Date', formattedDate])
                         ].filter(Boolean).join('');
 
+                        const cad = cadLink(val("COUNTY"), val("PROP_ID"));
+
                         const divider = '<hr style="border:0; border-top: 1px solid #eee; margin: 8px 0;">';
 
                         const content = `
                             <div class="parcel-popup">
                                 <h4>Property Details</h4>
                                 ${sections.join(divider)}
-                                ${footerRows ? `${divider}<div style="font-size:10px; color:#888;">${footerRows}</div>` : ''}
+                                ${(footerRows || cad) ? divider : ''}
+                                ${footerRows ? `<div style="font-size:10px; color:#888;">${footerRows}</div>` : ''}
+                                ${cad ? `<div style="margin-top:6px;"><a href="${cad.url}" target="_blank" rel="noopener" style="font-size:12px; font-weight:600; color:#2563eb; text-decoration:none;">${cad.label}</a></div>` : ''}
                             </div>
                         `;
                         L.popup({ maxWidth: 320, maxHeight: 400 }).setLatLng(e.latlng).setContent(content).openOn(map);
