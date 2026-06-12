@@ -485,9 +485,15 @@
                 });
         }
 
-        function colorForDelta(delta, maxAbsDelta) {
-            if (maxAbsDelta <= 0) return '#ffffff';
-            let t = Math.min(1, Math.max(Math.abs(delta) / maxAbsDelta, delta === 0 ? 0 : 0.15));
+        // Color intensity reflects |delta| as a percentage of the selected
+        // parcel's value, so a $10 difference stays near-white while a
+        // difference of 25%+ of the baseline value reaches full saturation.
+        const COMPARE_PCT_FOR_FULL_COLOR = 0.25;
+
+        function colorForDelta(delta, selectedValue) {
+            if (selectedValue <= 0) return '#ffffff';
+            const pct = Math.abs(delta) / selectedValue;
+            const t = Math.min(1, pct / COMPARE_PCT_FOR_FULL_COLOR);
             const target = delta > 0 ? [46, 204, 113] : [231, 76, 60];
             const mix = (c) => Math.round(255 + (c - 255) * t);
             return `rgb(${mix(target[0])}, ${mix(target[1])}, ${mix(target[2])})`;
@@ -521,13 +527,6 @@
             clearCompareOverlay();
 
             const selectedValue = Number(selectedProps.TOTAL_VALU) || 0;
-            const features = featureCollection.features || [];
-
-            let maxAbsDelta = 0;
-            features.forEach((f) => {
-                const val = Number(f.properties.TOTAL_VALU) || 0;
-                maxAbsDelta = Math.max(maxAbsDelta, Math.abs(val - selectedValue));
-            });
 
             compareLayerGroup = L.layerGroup();
 
@@ -535,7 +534,7 @@
                 style: (feature) => {
                     const val = Number(feature.properties.TOTAL_VALU) || 0;
                     const delta = val - selectedValue;
-                    return { color: '#333', weight: 1, fillColor: colorForDelta(delta, maxAbsDelta), fillOpacity: 0.6 };
+                    return { color: '#333', weight: 1, fillColor: colorForDelta(delta, selectedValue), fillOpacity: 0.6 };
                 },
                 onEachFeature: (feature, layer) => {
                     const val = Number(feature.properties.TOTAL_VALU) || 0;
