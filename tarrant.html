@@ -112,16 +112,25 @@
             border: 1px solid #ddd;
             display: none;
             align-items: center;
+            flex-wrap: wrap;
             gap: 6px;
         }
 
-        #vc-range-wrap input {
+        #vc-range-wrap input[type="number"] {
             width: 48px;
             font-size: 13px;
             padding: 2px 4px;
             border: 1px solid #ccc;
             border-radius: 6px;
             font-family: inherit;
+        }
+
+        #vc-range-wrap label.vc-checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-left: 6px;
+            font-weight: normal;
         }
 
         .leaflet-bar {
@@ -191,6 +200,10 @@
         <label for="vc-range">Compare:</label>
         <input type="number" id="vc-range" value="10" min="1" max="50" step="1">
         <span>houses</span>
+        <label class="vc-checkbox-label" for="vc-entire-street">
+            <input type="checkbox" id="vc-entire-street">
+            Entire street
+        </label>
     </div>
     <div id="map"></div>
 
@@ -345,13 +358,18 @@
             return String(str).replace(/'/g, "''");
         }
 
-        function buildCompareWhereClause(props, range) {
-            const lo = Number(props.STREET_NO) - range * 2;
-            const hi = Number(props.STREET_NO) + range * 2;
+        function buildCompareWhereClause(props, range, entireStreet) {
             const streetNam = escapeSql(props.STREET_NAM || '');
             const streetTyp = escapeSql(props.STREET_TYP || '');
-            return `STREET_NAM = '${streetNam}' AND STREET_TYP = '${streetTyp}' ` +
-                   `AND STREET_NO BETWEEN ${lo} AND ${hi} AND ACCOUNT <> '${escapeSql(props.ACCOUNT)}'`;
+            let where = `STREET_NAM = '${streetNam}' AND STREET_TYP = '${streetTyp}' AND ACCOUNT <> '${escapeSql(props.ACCOUNT)}'`;
+
+            if (!entireStreet) {
+                const lo = Number(props.STREET_NO) - range * 2;
+                const hi = Number(props.STREET_NO) + range * 2;
+                where += ` AND STREET_NO BETWEEN ${lo} AND ${hi}`;
+            }
+
+            return where;
         }
 
         function onParcelClick(e) {
@@ -362,8 +380,9 @@
 
         function runValueCompare(props, layer) {
             const rangeInput = document.getElementById('vc-range');
+            const entireStreet = document.getElementById('vc-entire-street').checked;
             const range = Math.max(1, parseInt(rangeInput.value, 10) || 10);
-            const where = buildCompareWhereClause(props, range);
+            const where = buildCompareWhereClause(props, range, entireStreet);
             const requestId = ++compareRequestId;
             const vcBtn = document.getElementById('vc-btn');
             vcBtn.classList.add('btn-loading');
@@ -451,6 +470,10 @@
 
             compareLayerGroup.addTo(map);
         }
+
+        document.getElementById('vc-entire-street').addEventListener('change', (e) => {
+            document.getElementById('vc-range').disabled = e.target.checked;
+        });
 
         function toggleValueCompare() {
             valueCompareActive = !valueCompareActive;
