@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="tra-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1e3a5f"/>
+      <stop offset="100%" stop-color="#0a1628"/>
+    </linearGradient>
+    <linearGradient id="tra-stone" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#cbd5e1"/>
+      <stop offset="100%" stop-color="#64748b"/>
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="20" fill="url(#tra-bg)"/>
+  <!-- Texas State Capitol (Austin) silhouette -->
+  <!-- main block -->
+  <rect x="28" y="40" width="44" height="10" fill="url(#tra-stone)"/>
+  <!-- pediment over the entrance -->
+  <polygon points="40,40 50,33 60,40" fill="url(#tra-stone)"/>
+  <!-- dome drum -->
+  <rect x="44" y="24" width="12" height="10" fill="url(#tra-stone)"/>
+  <!-- rotunda dome -->
+  <path d="M43,24 Q50,8 57,24 Z" fill="url(#tra-stone)"/>
+  <!-- Goddess of Liberty finial -->
+  <rect x="49.3" y="6" width="1.4" height="5" fill="url(#tra-stone)"/>
+  <polygon points="50,3 51.1,6 48.9,6" fill="#ffffff"/>
+  <!-- columns -->
+  <path stroke="#0a1628" stroke-width="1" d="M34,40 V50 M41,40 V50 M59,40 V50 M66,40 V50"/>
+  <!-- GPS pin marking a parcel -->
+  <circle cx="50" cy="63" r="12" fill="#ffffff"/>
+  <circle cx="50" cy="63" r="5" fill="#0a1628"/>
+  <polygon points="43,72 50,88 57,72" fill="#ffffff"/>
+  <ellipse cx="50" cy="88" rx="7" ry="2.5" fill="#ffffff"/>
+</svg>
