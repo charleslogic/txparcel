@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Land Owner - Denton</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Land Owner - Denton">
+    <meta name="theme-color" content="#0a1628">
+    <link rel="apple-touch-icon" sizes="180x180" href="denton-icon.png">
+    <link rel="icon" type="image/svg+xml" href="denton-icon.svg">
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #f0f0f0;
+            overflow: hidden;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .custom-control-btn,
+        .leaflet-control-zoom-in,
+        .leaflet-control-zoom-out,
+        .leaflet-control-geocoder-icon {
+            background-color: white !important;
+            width: 54px !important;
+            height: 54px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-size: 26px !important;
+            border-radius: 14px !important;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3) !important;
+            margin-bottom: 12px !important;
+            border: none !important;
+            color: black !important;
+            text-decoration: none !important;
+            transition: all 0.3s ease;
+        }
+
+        .btn-active {
+            background-color: #007bff !important;
+            color: white !important;
+            box-shadow: 0 0 15px rgba(0, 123, 255, 0.8) !important;
+            animation: pulse-glow 2s infinite;
+        }
+
+        .btn-loading {
+            animation: spin 1s linear infinite !important;
+        }
+
+        .control-hidden {
+            display: none !important;
+        }
+
+        @keyframes pulse-glow {
+
+            0%,
+            100% {
+                box-shadow: 0 0 5px rgba(0, 123, 255, 0.6);
+            }
+
+            50% {
+                box-shadow: 0 0 20px rgba(0, 123, 255, 0.9);
+            }
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        #zoom-display {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            color: #222;
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-family: -apple-system, sans-serif;
+            font-size: 12px;
+            font-weight: bold;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+            pointer-events: none;
+            border: 1px solid #ddd;
+        }
+
+        #vc-mode-wrap {
+            position: absolute;
+            top: 70px;
+            right: 15px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            color: #222;
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-family: -apple-system, sans-serif;
+            font-size: 12px;
+            font-weight: bold;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+            border: 1px solid #ddd;
+            display: none;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        #vc-mode-wrap label.vc-option-label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: normal;
+        }
+
+        .leaflet-bar {
+            border: none !important;
+            box-shadow: none !important;
+        }
+
+        .leaflet-control-zoom {
+            margin-left: 12px !important;
+            margin-top: 12px !important;
+        }
+
+        .parcel-popup {
+            font-family: -apple-system, sans-serif;
+            min-width: 220px;
+        }
+
+        .action-link {
+            display: block;
+            background: #007bff;
+            color: white !important;
+            text-align: center;
+            padding: 14px;
+            text-decoration: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .vc-delta-label {
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid #888;
+            border-radius: 6px;
+            padding: 2px 5px;
+            font-size: 11px;
+            font-weight: bold;
+            font-family: -apple-system, sans-serif;
+            white-space: nowrap;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #222;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
+        .vc-baseline-label {
+            background: #FFD700;
+            border: 2px solid #b8860b;
+            border-radius: 6px;
+            padding: 2px 6px;
+            font-size: 12px;
+            font-weight: bold;
+            font-family: -apple-system, sans-serif;
+            white-space: nowrap;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #222;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+        }
+
+        .value-label {
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid #007bff;
+            border-radius: 6px;
+            padding: 2px 5px;
+            font-size: 11px;
+            font-weight: bold;
+            font-family: -apple-system, sans-serif;
+            white-space: nowrap;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #0a1628;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+            line-height: 1.2;
+        }
+
+        .value-label-sqft {
+            display: block;
+            font-size: 10px;
+            font-weight: normal;
+            color: #007bff;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="zoom-display">Zoom: 18</div>
+    <div id="vc-mode-wrap">
+        <label class="vc-option-label" for="vc-metric-total">
+            <input type="radio" name="vc-metric" id="vc-metric-total" checked>
+            Total value
+        </label>
+        <label class="vc-option-label" for="vc-metric-persqft">
+            <input type="radio" name="vc-metric" id="vc-metric-persqft">
+            $/sqft
+        </label>
+    </div>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/esri-leaflet@3.0.10/dist/esri-leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
+    <script>
+        // 1. DENTON COUNTY CONFIG (Denton CAD Parcels_with_CAMA_Data layer)
+        const DENTON_URL = 'https://geo.dentoncad.com/arcgis/rest/services/Hosted/Parcels_with_CAMA_Data/FeatureServer/3';
+        const PARCEL_MIN_ZOOM = 16;
+        const VALUE_LABEL_MIN_ZOOM = 18;
+        const queryFields = [
+            'objectid', 'pid', 'geoid', 'name', 'namesecondary', 'situs_full_address',
+            'ownermarketvalue', 'ownerappraisedvalue', 'improvementvalue', 'landhsvalue', 'landnhsvalue',
+            'imprvactualyearbuilt', 'imprvmainarea', 'imprvtotalarea', 'land_sqft', 'legalacreage',
+            'abstractsubdivisiondescription', 'schooltaxingunitname', 'property_url'
+        ];
+        // Denton CAD ships a ready-made detail link per parcel; fall back to the
+        // Prodigy URL pattern (keyed by pid) if it's ever missing.
+        const getDetailLink = (props) => props.property_url || `https://denton.prodigycad.com/property-detail/${props.pid}`;
+
+        const baseLayers = [
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxNativeZoom: 19, maxZoom: 22 }),
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 19, maxZoom: 22 }),
+            L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 16, maxZoom: 22 })
+        ];
+        let currentBaseIndex = 0;
+
+        const map = L.map('map', { center: [33.2148, -97.1331], zoom: 18, maxZoom: 22, zoomControl: true });
+        map.addLayer(baseLayers[0]);
+
+        const zoomDiv = document.getElementById('zoom-display');
+        map.on('zoomend', () => { zoomDiv.innerHTML = `Zoom: ${map.getZoom()}`; });
+
+        let parcelLayer = null;
+        let isOverlayActive = false;
+        let valueCompareActive = false;
+        let compareLayerGroup = null;
+        let compareMetric = 'total'; // 'total' | 'persqft'
+        let lastCompare = null;      // remembers the active comparison so the metric toggle can rebuild it
+        let showValuesActive = false;
+        let valuesLayerGroup = null;
+
+        // 2. POPUPS
+        function fmtMoney(n) {
+            return `$${Math.round(Number(n) || 0).toLocaleString()}`;
+        }
+
+        function popupRow(label, value) {
+            if (value === null || value === undefined || value === '') return '';
+            return `<tr><td><b>${label}:</b></td><td>${value}</td></tr>`;
+        }
+
+        // Total market value for a parcel (Denton's owner-facing market value).
+        function getTotalValue(props) {
+            return Number(props.ownermarketvalue) || 0;
+        }
+
+        // Living area in sqft; main area preferred, total area as fallback.
+        function getLivingArea(props) {
+            return Number(props.imprvmainarea) || Number(props.imprvtotalarea) || 0;
+        }
+
+        // Builds the "extra" detail rows shared by both popups, omitting any
+        // field that is blank/zero in the source data.
+        function buildDetailRows(props) {
+            const rows = [];
+
+            const acres = Number(props.legalacreage) || 0;
+            const lotSqft = Number(props.land_sqft) || 0;
+            if (acres > 0 || lotSqft > 0) {
+                const parts = [];
+                if (acres > 0) parts.push(`${acres.toFixed(3)} ac`);
+                if (lotSqft > 0) parts.push(`${Math.round(lotSqft).toLocaleString()} sqft`);
+                rows.push(popupRow('Lot Size', parts.join(' / ')));
+            }
+
+            const yearBuilt = Number(props.imprvactualyearbuilt) || 0;
+            if (yearBuilt > 0) rows.push(popupRow('Year Built', yearBuilt));
+
+            const livingArea = getLivingArea(props);
+            const totalValue = getTotalValue(props);
+            if (livingArea > 0) {
+                rows.push(popupRow('Living Area', `${Math.round(livingArea).toLocaleString()} sqft`));
+                if (totalValue > 0) {
+                    rows.push(popupRow('$/sqft', fmtMoney(totalValue / livingArea)));
+                }
+            }
+
+            const landValue = (Number(props.landhsvalue) || 0) + (Number(props.landnhsvalue) || 0);
+            const imprValue = Number(props.improvementvalue) || 0;
+            if (landValue > 0 || imprValue > 0) {
+                rows.push(popupRow('Land / Improvement', `${fmtMoney(landValue)} / ${fmtMoney(imprValue)}`));
+            }
+
+            // Appraised (capped) value, shown only when it differs from market.
+            const appraised = Number(props.ownerappraisedvalue) || 0;
+            if (appraised > 0 && Math.round(appraised) !== Math.round(totalValue)) {
+                rows.push(popupRow('Appraised (Capped)', fmtMoney(appraised)));
+            }
+
+            const subdivision = String(props.abstractsubdivisiondescription || '').trim();
+            if (subdivision) rows.push(popupRow('Subdivision', subdivision));
+
+            const school = String(props.schooltaxingunitname || '').trim();
+            if (school) rows.push(popupRow('School District', school));
+
+            return rows.join('');
+        }
+
+        function buildOwnerName(props) {
+            return [props.name, props.namesecondary].filter(Boolean).join(' / ') || 'N/A';
+        }
+
+        function buildParcelPopup(props) {
+            const owner = buildOwnerName(props);
+            const account = props.geoid || props.pid || 'N/A';
+            const addr = props.situs_full_address || 'N/A';
+            const totalValue = getTotalValue(props);
+
+            return `<div class="parcel-popup">
+                <b style="font-size:16px;">${owner}</b><br>
+                <small style="color:#666;">${addr}</small><br>
+                <table style="width:100%; font-size:13px; margin-top:8px; border-top: 1px solid #eee; padding-top:5px;">
+                    <tr><td><b>Acct:</b></td><td>${account}</td></tr>
+                    ${buildDetailRows(props)}
+                    <tr><td><b>Total Value:</b></td><td>${fmtMoney(totalValue)}</td></tr>
+                </table>
+                <a href="${getDetailLink(props)}" target="_blank" class="action-link">View Details</a>
+            </div>`;
+        }
+
+        // Value used for the compare overlay's color/delta. Returns null when the
+        // active metric can't be computed for a parcel (e.g. $/sqft with no living area).
+        function getMetricValue(props) {
+            const total = getTotalValue(props);
+            if (compareMetric === 'persqft') {
+                const living = getLivingArea(props);
+                return living > 0 ? total / living : null;
+            }
+            return total;
+        }
+
+        function fmtMetricValue(value) {
+            if (value === null) return 'N/A';
+            return compareMetric === 'persqft' ? `${fmtMoney(value)}/sqft` : fmtMoney(value);
+        }
+
+        const metricLabel = () => (compareMetric === 'persqft' ? '$/sqft' : 'Total value');
+
+        // Metric-aware delta for the compare overlay labels/popups.
+        function formatMetricDelta(delta) {
+            if (delta === null) return 'N/A';
+            const sign = delta > 0 ? '+' : (delta < 0 ? '-' : '');
+            const abs = Math.round(Math.abs(delta));
+            const suffix = compareMetric === 'persqft' ? '/sqft' : '';
+            return `${sign}$${abs.toLocaleString()}${suffix}`;
+        }
+
+        function buildComparePopup(props, delta) {
+            const owner = buildOwnerName(props);
+            const account = props.geoid || props.pid || 'N/A';
+            const addr = props.situs_full_address || 'N/A';
+            const totalValue = getTotalValue(props);
+            const deltaStr = formatMetricDelta(delta);
+            const deltaColor = delta === null ? '#888' : (delta > 0 ? '#2ecc71' : (delta < 0 ? '#e74c3c' : '#888'));
+
+            return `<div class="parcel-popup">
+                <b style="font-size:16px;">${owner}</b><br>
+                <small style="color:#666;">${addr}</small><br>
+                <table style="width:100%; font-size:13px; margin-top:8px; border-top: 1px solid #eee; padding-top:5px;">
+                    <tr><td><b>Acct:</b></td><td>${account}</td></tr>
+                    ${buildDetailRows(props)}
+                    <tr><td><b>Total Value:</b></td><td>${fmtMoney(totalValue)}</td></tr>
+                    <tr><td><b>vs. Selected (${metricLabel()}):</b></td><td style="color:${deltaColor}; font-weight:bold;">${deltaStr}</td></tr>
+                </table>
+                <a href="${getDetailLink(props)}" target="_blank" class="action-link">View Details</a>
+            </div>`;
+        }
+
+        // 3. PARCEL LAYER (perf-hardened: zoom gate, restricted fields, simplified
+        // geometry, canvas rendering, request-error handling)
+        function refreshParcelLayer() {
+            if (!isOverlayActive) return;
+
+            const zoom = map.getZoom();
+            const btn = document.getElementById('tad-btn');
+
+            if (zoom < PARCEL_MIN_ZOOM) {
+                if (parcelLayer) { map.removeLayer(parcelLayer); parcelLayer = null; }
+                clearCompareOverlay();
+                refreshValueLabels();
+                btn.classList.remove('btn-loading');
+                btn.innerHTML = '📋';
+                zoomDiv.innerHTML = `Zoom: ${zoom} (Zoom in to see parcels)`;
+                return;
+            }
+
+            if (parcelLayer) {
+                zoomDiv.innerHTML = `Zoom: ${zoom}`;
+                return;
+            }
+
+            zoomDiv.innerHTML = `Zoom: ${zoom}`;
+            btn.classList.add('btn-loading');
+            btn.innerHTML = '⏳';
+
+            parcelLayer = L.esri.featureLayer({
+                url: DENTON_URL,
+                fields: queryFields,
+                simplifyFactor: 0.35,
+                precision: 5,
+                renderer: L.canvas(),
+                style: () => ({ color: '#007bff', weight: 2, fillOpacity: 0.2 })
+            });
+
+            parcelLayer.on('load', () => {
+                btn.classList.remove('btn-loading');
+                btn.innerHTML = '📋';
+                refreshValueLabels();
+            });
+
+            parcelLayer.on('requesterror', () => {
+                btn.classList.remove('btn-loading');
+                btn.innerHTML = '📋';
+                zoomDiv.innerHTML = `Zoom: ${map.getZoom()} (Load error)`;
+            });
+
+            parcelLayer.bindPopup((l) => buildParcelPopup(l.feature.properties), { maxHeight: 320 });
+            parcelLayer.on('click', onParcelClick);
+
+            parcelLayer.addTo(map);
+        }
+
+        function toggleParcels() {
+            const btn = document.getElementById('tad-btn');
+            isOverlayActive = !isOverlayActive;
+
+            if (!isOverlayActive) {
+                if (parcelLayer) { map.removeLayer(parcelLayer); parcelLayer = null; }
+                clearCompareOverlay();
+                refreshValueLabels();
+                btn.classList.remove('btn-active');
+                btn.innerHTML = '📋';
+                document.getElementById('vc-btn').classList.add('control-hidden');
+                document.getElementById('values-btn').classList.add('control-hidden');
+                document.getElementById('vc-mode-wrap').style.display = 'none';
+                return;
+            }
+
+            btn.classList.add('btn-active');
+            document.getElementById('vc-btn').classList.remove('control-hidden');
+            document.getElementById('values-btn').classList.remove('control-hidden');
+            if (valueCompareActive) document.getElementById('vc-mode-wrap').style.display = 'flex';
+            refreshParcelLayer();
+        }
+
+        map.on('moveend zoomend', () => {
+            refreshParcelLayer();
+            refreshValueLabels();
+        });
+
+        // 4. VALUE COMPARE - color all currently-visible parcels by their
+        // market-value (or $/sqft) delta vs. the selected parcel
+        function onParcelClick(e) {
+            if (valueCompareActive) {
+                runValueCompare(e.layer.feature.properties, e.layer);
+            }
+        }
+
+        function runValueCompare(props, layer) {
+            if (!parcelLayer) return;
+
+            const features = [];
+            parcelLayer.eachActiveFeature((l) => {
+                if (l.feature.properties.pid === props.pid) return;
+                features.push(l.toGeoJSON());
+            });
+
+            buildCompareOverlay(props, { type: 'FeatureCollection', features }, layer);
+        }
+
+        // Color intensity reflects |delta| as a percentage of the selected
+        // parcel's value, so a $10 difference stays near-white while a
+        // difference of 25%+ of the baseline value reaches full saturation.
+        const COMPARE_PCT_FOR_FULL_COLOR = 0.25;
+
+        function colorForDelta(delta, selectedValue) {
+            if (delta === null || !selectedValue || selectedValue <= 0) return '#ffffff';
+            const pct = Math.abs(delta) / selectedValue;
+            const t = Math.min(1, pct / COMPARE_PCT_FOR_FULL_COLOR);
+            const target = delta > 0 ? [46, 204, 113] : [231, 76, 60];
+            const mix = (c) => Math.round(255 + (c - 255) * t);
+            return `rgb(${mix(target[0])}, ${mix(target[1])}, ${mix(target[2])})`;
+        }
+
+        function clearCompareOverlay() {
+            if (compareLayerGroup) {
+                map.removeLayer(compareLayerGroup);
+                compareLayerGroup = null;
+            }
+            lastCompare = null;
+        }
+
+        function addBaselineHighlight(selectedProps, selectedLayer) {
+            const highlight = L.polygon(selectedLayer.getLatLngs(), {
+                color: '#FFD700',
+                weight: 3,
+                fillOpacity: 0,
+                interactive: false
+            });
+            compareLayerGroup.addLayer(highlight);
+
+            const value = getMetricValue(selectedProps);
+            const label = L.marker(selectedLayer.getBounds().getCenter(), {
+                icon: L.divIcon({ className: 'vc-baseline-label', html: fmtMetricValue(value), iconSize: null }),
+                interactive: false
+            });
+            compareLayerGroup.addLayer(label);
+        }
+
+        function buildCompareOverlay(selectedProps, featureCollection, selectedLayer) {
+            clearCompareOverlay();
+            lastCompare = { selectedProps, featureCollection, selectedLayer };
+
+            const selectedValue = getMetricValue(selectedProps);
+
+            compareLayerGroup = L.layerGroup();
+
+            const neighborLayer = L.geoJSON(featureCollection, {
+                style: (feature) => {
+                    const val = getMetricValue(feature.properties);
+                    const delta = (val === null || selectedValue === null) ? null : val - selectedValue;
+                    return { color: '#333', weight: 1, fillColor: colorForDelta(delta, selectedValue), fillOpacity: 0.6 };
+                },
+                onEachFeature: (feature, layer) => {
+                    const val = getMetricValue(feature.properties);
+                    const delta = (val === null || selectedValue === null) ? null : val - selectedValue;
+
+                    layer.bindPopup(buildComparePopup(feature.properties, delta), { maxHeight: 320 });
+
+                    const label = L.marker(layer.getBounds().getCenter(), {
+                        icon: L.divIcon({ className: 'vc-delta-label', html: formatMetricDelta(delta), iconSize: null }),
+                        interactive: false
+                    });
+                    compareLayerGroup.addLayer(label);
+                }
+            });
+            compareLayerGroup.addLayer(neighborLayer);
+
+            addBaselineHighlight(selectedProps, selectedLayer);
+
+            compareLayerGroup.addTo(map);
+        }
+
+        function toggleValueCompare() {
+            valueCompareActive = !valueCompareActive;
+            const btn = document.getElementById('vc-btn');
+            const modeWrap = document.getElementById('vc-mode-wrap');
+
+            if (valueCompareActive) {
+                btn.classList.add('btn-active');
+                modeWrap.style.display = 'flex';
+            } else {
+                btn.classList.remove('btn-active');
+                modeWrap.style.display = 'none';
+                clearCompareOverlay();
+            }
+        }
+
+        // Switch the overlay metric (total value vs. $/sqft) and rebuild the
+        // current comparison in place, without re-querying the service.
+        function setCompareMetric(metric) {
+            if (compareMetric === metric) return;
+            compareMetric = metric;
+            if (lastCompare) {
+                buildCompareOverlay(lastCompare.selectedProps, lastCompare.featureCollection, lastCompare.selectedLayer);
+            }
+        }
+
+        document.getElementById('vc-metric-total').addEventListener('change', () => setCompareMetric('total'));
+        document.getElementById('vc-metric-persqft').addEventListener('change', () => setCompareMetric('persqft'));
+
+        // 5. SHOW VALUES - label every visible parcel with its total value
+        function refreshValueLabels() {
+            if (valuesLayerGroup) {
+                map.removeLayer(valuesLayerGroup);
+                valuesLayerGroup = null;
+            }
+
+            if (!showValuesActive || !parcelLayer || map.getZoom() < VALUE_LABEL_MIN_ZOOM) return;
+
+            valuesLayerGroup = L.layerGroup();
+            parcelLayer.eachActiveFeature((l) => {
+                const props = l.feature.properties;
+                const value = getTotalValue(props);
+                const living = getLivingArea(props);
+                const perSqft = living > 0 ? `<span class="value-label-sqft">${fmtMoney(value / living)}/sqft</span>` : '';
+                const label = L.marker(l.getBounds().getCenter(), {
+                    icon: L.divIcon({ className: 'value-label', html: `${fmtMoney(value)}${perSqft}`, iconSize: null }),
+                    interactive: false
+                });
+                valuesLayerGroup.addLayer(label);
+            });
+            valuesLayerGroup.addTo(map);
+        }
+
+        function toggleShowValues() {
+            showValuesActive = !showValuesActive;
+            const btn = document.getElementById('values-btn');
+
+            if (showValuesActive) {
+                btn.classList.add('btn-active');
+            } else {
+                btn.classList.remove('btn-active');
+            }
+
+            refreshValueLabels();
+        }
+
+        // 6. CONTROLS
+        L.Control.geocoder({ position: 'topleft', collapsed: true }).addTo(map);
+
+        const FieldControls = L.Control.extend({
+            options: { position: 'topleft' },
+            onAdd: function () {
+                const container = L.DomUtil.create('div');
+                const gpsBtn = L.DomUtil.create('a', 'custom-control-btn', container);
+                gpsBtn.innerHTML = '🎯';
+                gpsBtn.onclick = (e) => { e.preventDefault(); map.locate({ setView: true, maxZoom: 18 }); };
+
+                const cycleBtn = L.DomUtil.create('a', 'custom-control-btn', container);
+                cycleBtn.innerHTML = '🗺️';
+                cycleBtn.onclick = (e) => {
+                    e.preventDefault();
+                    map.removeLayer(baseLayers[currentBaseIndex]);
+                    currentBaseIndex = (currentBaseIndex + 1) % baseLayers.length;
+                    map.addLayer(baseLayers[currentBaseIndex]);
+                };
+
+                const tadBtn = L.DomUtil.create('a', 'custom-control-btn', container);
+                tadBtn.id = "tad-btn";
+                tadBtn.innerHTML = '📋';
+                tadBtn.onclick = (e) => { e.preventDefault(); toggleParcels(); };
+
+                const vcBtn = L.DomUtil.create('a', 'custom-control-btn control-hidden', container);
+                vcBtn.id = "vc-btn";
+                vcBtn.innerHTML = '⚖️';
+                vcBtn.onclick = (e) => { e.preventDefault(); toggleValueCompare(); };
+
+                const valuesBtn = L.DomUtil.create('a', 'custom-control-btn control-hidden', container);
+                valuesBtn.id = "values-btn";
+                valuesBtn.innerHTML = '💰';
+                valuesBtn.onclick = (e) => { e.preventDefault(); toggleShowValues(); };
+
+                return container;
+            }
+        });
+        map.addControl(new FieldControls());
+
+        let userMarker;
+        map.on('locationfound', (e) => {
+            if (userMarker) userMarker.setLatLng(e.latlng);
+            else userMarker = L.marker(e.latlng).addTo(map);
+            if (map.getZoom() < 18) map.setZoom(18);
+        });
+    </script>
+</body>
+
+</html>
