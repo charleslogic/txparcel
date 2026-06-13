@@ -60,6 +60,10 @@
             animation: spin 1s linear infinite !important;
         }
 
+        .control-hidden {
+            display: none !important;
+        }
+
         @keyframes pulse-glow {
 
             0%,
@@ -156,6 +160,21 @@
             color: #222;
             box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
         }
+
+        .value-label {
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid #007bff;
+            border-radius: 6px;
+            padding: 2px 5px;
+            font-size: 11px;
+            font-weight: bold;
+            font-family: -apple-system, sans-serif;
+            white-space: nowrap;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #0a1628;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
     </style>
 </head>
 
@@ -172,6 +191,7 @@
         // 1. DALLAS COUNTY CONFIG (DCAD ParcelPublishing layer)
         const DALLAS_URL = 'https://maps.dcad.org/prdwa/rest/services/Property/ParcelQuery/MapServer/4';
         const PARCEL_MIN_ZOOM = 16;
+        const VALUE_LABEL_MIN_ZOOM = 18;
         const queryFields = [
             'OBJECTID', 'PARCELID', 'OWNERNME1', 'OWNERNME2', 'SITEADDRESS',
             'CNTASSDVAL', 'LNDVALUE', 'IMPVALUE', 'PRVASSDVAL',
@@ -197,6 +217,8 @@
         let isOverlayActive = false;
         let valueCompareActive = false;
         let compareLayerGroup = null;
+        let showValuesActive = false;
+        let valuesLayerGroup = null;
 
         // 2. POPUPS
         function fmtMoney(n) {
@@ -311,6 +333,7 @@
             if (zoom < PARCEL_MIN_ZOOM) {
                 if (parcelLayer) { map.removeLayer(parcelLayer); parcelLayer = null; }
                 clearCompareOverlay();
+                refreshValueLabels();
                 btn.classList.remove('btn-loading');
                 btn.innerHTML = '📋';
                 zoomDiv.innerHTML = `Zoom: ${zoom} (Zoom in to see parcels)`;
@@ -338,6 +361,7 @@
             parcelLayer.on('load', () => {
                 btn.classList.remove('btn-loading');
                 btn.innerHTML = '📋';
+                refreshValueLabels();
             });
 
             parcelLayer.on('requesterror', () => {
@@ -359,16 +383,24 @@
             if (!isOverlayActive) {
                 if (parcelLayer) { map.removeLayer(parcelLayer); parcelLayer = null; }
                 clearCompareOverlay();
+                refreshValueLabels();
                 btn.classList.remove('btn-active');
                 btn.innerHTML = '📋';
+                document.getElementById('vc-btn').classList.add('control-hidden');
+                document.getElementById('values-btn').classList.add('control-hidden');
                 return;
             }
 
             btn.classList.add('btn-active');
+            document.getElementById('vc-btn').classList.remove('control-hidden');
+            document.getElementById('values-btn').classList.remove('control-hidden');
             refreshParcelLayer();
         }
 
-        map.on('moveend zoomend', refreshParcelLayer);
+        map.on('moveend zoomend', () => {
+            refreshParcelLayer();
+            refreshValueLabels();
+        });
 
         // 4. VALUE COMPARE - color all currently-visible parcels by their
         // CNTASSDVAL delta vs. the selected parcel
@@ -473,7 +505,41 @@
             }
         }
 
-        // 5. CONTROLS
+        // 5. SHOW VALUES - label every visible parcel with its total value
+        function refreshValueLabels() {
+            if (valuesLayerGroup) {
+                map.removeLayer(valuesLayerGroup);
+                valuesLayerGroup = null;
+            }
+
+            if (!showValuesActive || !parcelLayer || map.getZoom() < VALUE_LABEL_MIN_ZOOM) return;
+
+            valuesLayerGroup = L.layerGroup();
+            parcelLayer.eachActiveFeature((l) => {
+                const value = Number(l.feature.properties.CNTASSDVAL) || 0;
+                const label = L.marker(l.getBounds().getCenter(), {
+                    icon: L.divIcon({ className: 'value-label', html: fmtMoney(value), iconSize: null }),
+                    interactive: false
+                });
+                valuesLayerGroup.addLayer(label);
+            });
+            valuesLayerGroup.addTo(map);
+        }
+
+        function toggleShowValues() {
+            showValuesActive = !showValuesActive;
+            const btn = document.getElementById('values-btn');
+
+            if (showValuesActive) {
+                btn.classList.add('btn-active');
+            } else {
+                btn.classList.remove('btn-active');
+            }
+
+            refreshValueLabels();
+        }
+
+        // 6. CONTROLS
         L.Control.geocoder({ position: 'topleft', collapsed: true }).addTo(map);
 
         const FieldControls = L.Control.extend({
@@ -498,17 +564,21 @@
                 tadBtn.innerHTML = '📋';
                 tadBtn.onclick = (e) => { e.preventDefault(); toggleParcels(); };
 
-                const vcBtn = L.DomUtil.create('a', 'custom-control-btn', container);
+                const vcBtn = L.DomUtil.create('a', 'custom-control-btn control-hidden', container);
                 vcBtn.id = "vc-btn";
-                vcBtn.innerHTML = '💰';
+                vcBtn.innerHTML = '⚖️';
                 vcBtn.onclick = (e) => { e.preventDefault(); toggleValueCompare(); };
+
+                const valuesBtn = L.DomUtil.create('a', 'custom-control-btn control-hidden', container);
+                valuesBtn.id = "values-btn";
+                valuesBtn.innerHTML = '💰';
+                valuesBtn.onclick = (e) => { e.preventDefault(); toggleShowValues(); };
 
                 return container;
             }
         });
         map.addControl(new FieldControls());
 
-        map.locate({ setView: true, maxZoom: 18 });
         let userMarker;
         map.on('locationfound', (e) => {
             if (userMarker) userMarker.setLatLng(e.latlng);
