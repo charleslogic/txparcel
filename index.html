@@ -3,545 +3,260 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Land Owner">
+    <meta name="apple-mobile-web-app-title" content="Texas Land Maps">
     <meta name="theme-color" content="#0a1628">
     <link rel="apple-touch-icon" sizes="180x180" href="txparcel-icon.png">
     <link rel="icon" type="image/svg+xml" href="txparcel-icon.svg">
-    <title>Texas Land Map Pro v1.9</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <title>Texas Land Maps</title>
     <style>
-        body,
-        html {
+        :root {
+            --accent: #007bff;
+            --ink: #e8eef6;
+            --muted: #9fb2c8;
+        }
+
+        * { box-sizing: border-box; }
+
+        body, html {
             margin: 0;
             padding: 0;
-            height: 100%;
-            font-family: -apple-system, sans-serif;
-            background: #e0e0e0;
+            min-height: 100%;
         }
 
-        #map {
-            height: 100vh;
-            width: 100%;
+        body {
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: var(--ink);
+            background: linear-gradient(180deg, #1e3a5f 0%, #0a1628 100%);
+            background-attachment: fixed;
+            padding: max(24px, env(safe-area-inset-top)) 18px calc(40px + env(safe-area-inset-bottom));
         }
 
-        .ui-panel {
-            position: absolute;
-            right: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
+        .wrap {
+            max-width: 680px;
+            margin: 0 auto;
         }
 
-        .icon-btn {
-            width: 58px;
-            height: 58px;
-            background: white;
-            border-radius: 14px;
+        header {
+            text-align: center;
+            margin-bottom: 22px;
+        }
+
+        header img {
+            width: 64px;
+            height: 64px;
+            border-radius: 16px;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+        }
+
+        header h1 {
+            margin: 12px 0 4px;
+            font-size: 26px;
+            letter-spacing: 0.2px;
+        }
+
+        header p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .locate {
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-            cursor: pointer;
+            gap: 8px;
+            width: 100%;
+            max-width: 360px;
+            margin: 0 auto;
+            padding: 15px 18px;
             border: none;
-            font-size: 26px;
-            transition: box-shadow 0.2s, background 0.2s, border 0.2s;
-        }
-
-        .icon-btn:active {
-            transform: scale(0.92);
-        }
-
-        /* Active state: steady amber glow when overlay is ON */
-        .active-mode {
-            border: 3px solid #f59e0b;
-            background: #fffbeb;
-            box-shadow: 0 0 14px rgba(251, 191, 36, 0.7), 0 4px 10px rgba(0, 0, 0, 0.15);
-        }
-
-        /* Tile-loading pulse: button breathes while WMS tiles are fetching.
-           No rotation — tiles load progressively, not as a single spinner moment. */
-        @keyframes glowPulse {
-
-            0%,
-            100% {
-                box-shadow: 0 0 8px rgba(251, 191, 36, 0.5), 0 4px 10px rgba(0, 0, 0, 0.15);
-            }
-
-            50% {
-                box-shadow: 0 0 28px rgba(251, 191, 36, 1.0), 0 4px 10px rgba(0, 0, 0, 0.15);
-            }
-        }
-
-        /* Record-fetch spin: rotates while waiting for GetFeatureInfo click response */
-        @keyframes glowSpin {
-            0% {
-                transform: rotate(0deg);
-                box-shadow: 0 0 8px #fbbf24;
-            }
-
-            50% {
-                box-shadow: 0 0 22px #fbbf24;
-                background: #fffbeb;
-            }
-
-            100% {
-                transform: rotate(360deg);
-                box-shadow: 0 0 8px #fbbf24;
-            }
-        }
-
-        .tile-loading {
-            animation: glowPulse 0.9s ease-in-out infinite;
-            border: 3px solid #f59e0b;
-            background: #fffbeb;
-        }
-
-        .fetching {
-            animation: glowSpin 0.8s linear infinite;
-            border: 3px solid #f59e0b;
-        }
-
-        /* Server error state: red pulse when tiles repeatedly fail */
-        @keyframes errorPulse {
-
-            0%,
-            100% {
-                box-shadow: 0 0 8px rgba(239, 68, 68, 0.5), 0 4px 10px rgba(0, 0, 0, 0.15);
-            }
-
-            50% {
-                box-shadow: 0 0 22px rgba(239, 68, 68, 0.9), 0 4px 10px rgba(0, 0, 0, 0.15);
-            }
-        }
-
-        .tile-error {
-            animation: errorPulse 1.2s ease-in-out infinite;
-            border: 3px solid #ef4444;
-            background: #fff5f5;
-        }
-
-        /* Bolder, Darker Parcel Lines */
-        .bold-parcels {
-            filter: contrast(200%) brightness(0.7) saturate(1.8);
-            pointer-events: none;
-        }
-
-        .parcel-popup {
-            min-width: 250px;
-            font-size: 13px;
-            line-height: 1.5;
-        }
-
-        .parcel-popup h4 {
-            margin: 0 0 8px 0;
-            color: #2563eb;
-            border-bottom: 1px dotted #ccc;
-        }
-
-        .search-panel {
-            position: absolute;
-            left: 15px;
-            top: 15px;
-            z-index: 1001;
-            display: flex;
-            gap: 6px;
-            align-items: center;
-            padding: 10px;
-            background: rgba(255,255,255,0.95);
-            border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-            max-width: calc(100% - 30px);
-            width: 420px;
-            backdrop-filter: blur(8px);
-        }
-
-        .search-panel input {
-            flex: 1;
-            min-width: 0;
-            padding: 12px 14px;
-            border: 1px solid #cbd5e1;
             border-radius: 14px;
-            font-size: 14px;
+            background: var(--accent);
+            color: #fff;
+            font-size: 16px;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(0, 123, 255, 0.45);
+            transition: transform 0.15s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+        }
+
+        .locate:hover { box-shadow: 0 6px 20px rgba(0, 123, 255, 0.65); }
+        .locate:active { transform: scale(0.97); }
+        .locate[disabled] { opacity: 0.7; cursor: default; }
+
+        .status {
+            min-height: 20px;
+            margin: 10px 0 22px;
+            text-align: center;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 14px;
+        }
+
+        .tile {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            padding: 16px 10px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: var(--ink);
+            text-decoration: none;
+            transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .tile:hover, .tile:focus-visible {
+            transform: translateY(-3px);
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--accent);
+            box-shadow: 0 0 16px rgba(0, 123, 255, 0.5);
             outline: none;
         }
 
-        .search-panel input:focus {
-            border-color: #2563eb;
-            box-shadow: 0 0 0 4px rgba(37,99,235,0.12);
+        .tile:active { transform: scale(0.97); }
+
+        .tile img {
+            width: 76px;
+            height: 76px;
+            border-radius: 16px;
+            display: block;
+        }
+
+        .tile .name { font-size: 15px; font-weight: 600; }
+        .tile .sub { font-size: 11px; color: var(--muted); }
+
+        /* All-Texas fallback tile spans the row, laid out horizontally */
+        .tile-all {
+            grid-column: 1 / -1;
+            flex-direction: row;
+            justify-content: center;
+            gap: 16px;
+            padding: 16px 18px;
+            border-style: dashed;
+        }
+
+        .tile-all img { width: 56px; height: 56px; }
+        .tile-all .copy { text-align: left; }
+
+        footer {
+            margin-top: 26px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--muted);
         }
     </style>
 </head>
 
 <body>
+    <div class="wrap">
+        <header>
+            <img src="txparcel-icon.svg" alt="Texas Land Maps" />
+            <h1>Texas Land Maps</h1>
+            <p>Choose a county appraisal map</p>
+        </header>
 
-    <div class="search-panel">
-        <input id="searchInput" type="search" placeholder="GPS, street, city, park, landmark" aria-label="Search location" />
-        <button class="icon-btn" id="searchBtn" title="Search">🔍</button>
+        <button class="locate" id="locateBtn" type="button">📍 Use my location</button>
+        <div class="status" id="status"></div>
+
+        <div class="grid" id="grid"></div>
+
+        <footer>Property data from each county appraisal district.</footer>
     </div>
-
-    <div class="ui-panel">
-        <button class="icon-btn" onclick="map.zoomIn()">➕</button>
-        <button class="icon-btn" onclick="map.zoomOut()">➖</button>
-        <button class="icon-btn" id="gpsBtn" title="Locate Me">🎯</button>
-        <button class="icon-btn" id="satBtn" title="Satellite">🛰️</button>
-        <button class="icon-btn" id="parcelBtn" title="Ownership Data">📋</button>
-    </div>
-
-    <div id="map"></div>
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // 1. Setup Layers
-        const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
-        const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
+        // County apps with a dedicated appraisal-district map.
+        const COUNTIES = [
+            { name: 'Tarrant', file: 'tarrant.html', icon: 'cowtown-icon.svg' },
+            { name: 'Dallas',  file: 'dallas.html',  icon: 'dallas-icon.svg' },
+            { name: 'Denton',  file: 'denton.html',  icon: 'denton-icon.svg' },
+            { name: 'Collin',  file: 'collin.html',  icon: 'collin-icon.svg' },
+            { name: 'Hood',    file: 'hood.html',    icon: 'hood-icon.svg' },
+            { name: 'Parker',  file: 'parker.html',  icon: 'parker-icon.svg' }
+        ];
 
-        const map = L.map('map', { zoomControl: false }).setView([32.7357, -97.1081], 16);
-        osm.addTo(map);
+        // The statewide map is the fallback for counties without a dedicated app.
+        const STATEWIDE = 'statewide.html';
 
-        const wmsUrl = "https://feature.geographic.texas.gov/arcgis/services/Parcels/stratmap_land_parcels_48_most_recent/MapServer/WMSServer";
-        const parcelLayer = L.tileLayer.wms(wmsUrl, {
-            layers: '0',
-            format: 'image/png',
-            transparent: true,
-            version: '1.1.1',
-            className: 'bold-parcels'
+        // Build the tile grid.
+        const grid = document.getElementById('grid');
+        COUNTIES.forEach((c) => {
+            const a = document.createElement('a');
+            a.className = 'tile';
+            a.href = c.file;
+            a.innerHTML = `<img src="${c.icon}" alt="${c.name} County" />
+                <span class="name">${c.name}</span>
+                <span class="sub">County</span>`;
+            grid.appendChild(a);
         });
+        const all = document.createElement('a');
+        all.className = 'tile tile-all';
+        all.href = STATEWIDE;
+        all.innerHTML = `<img src="txparcel-icon.svg" alt="All Texas" />
+            <div class="copy">
+                <div class="name">All Texas</div>
+                <div class="sub">Statewide parcels — every other county</div>
+            </div>`;
+        grid.appendChild(all);
 
-        // 2. UI Controls
-        const parcelBtn = document.getElementById('parcelBtn');
-        const satBtn = document.getElementById('satBtn');
-        const gpsBtn = document.getElementById('gpsBtn');
-        let parcelsOn = false;
+        // "Use my location": geolocate, reverse-geocode to a county, route to its
+        // app — or to the statewide map when the county has no dedicated app.
+        const COUNTY_FILES = {};
+        COUNTIES.forEach((c) => { COUNTY_FILES[c.name.toLowerCase()] = c.file; });
 
-        // --- Wire up tile-loading events on the WMS layer ---
-        let tileErrorCount = 0;
-        const ERROR_THRESHOLD = 3; // failures before showing error state
+        const countyKey = (name) => String(name || '').toLowerCase().replace(/county/g, '').trim();
 
-        parcelLayer.on('loading', () => {
-            tileErrorCount = 0;
-            parcelBtn.classList.remove('active-mode', 'tile-error');
-            parcelBtn.classList.add('tile-loading');
-            parcelBtn.title = "Loading parcel data…";
-        });
-
-        parcelLayer.on('tileerror', () => {
-            tileErrorCount++;
-            if (tileErrorCount >= ERROR_THRESHOLD) {
-                parcelBtn.classList.remove('tile-loading');
-                parcelBtn.classList.add('tile-error');
-                parcelBtn.title = "Parcel server unavailable — tap to retry";
-            }
-        });
-
-        parcelLayer.on('load', () => {
-            tileErrorCount = 0;
-            parcelBtn.classList.remove('tile-loading', 'tile-error');
-            if (parcelsOn) parcelBtn.classList.add('active-mode');
-            parcelBtn.title = "Ownership Data";
-        });
-
-        satBtn.onclick = () => {
-            if (map.hasLayer(osm)) {
-                map.removeLayer(osm); sat.addTo(map); satBtn.classList.add('active-mode');
-            } else {
-                map.removeLayer(sat); osm.addTo(map); satBtn.classList.remove('active-mode');
-            }
+        const btn = document.getElementById('locateBtn');
+        const statusEl = document.getElementById('status');
+        const setStatus = (m) => { statusEl.textContent = m; };
+        const setBusy = (busy) => {
+            btn.disabled = busy;
+            btn.textContent = busy ? '⏳ Locating…' : '📍 Use my location';
         };
 
-        parcelBtn.onclick = () => {
-            if (!parcelsOn) {
-                parcelLayer.addTo(map);
-                // tile-loading event takes over immediately on add;
-                // on retry from error state, reset error class first
-                parcelBtn.classList.remove('tile-error');
-            } else {
-                map.removeLayer(parcelLayer);
-                parcelBtn.classList.remove('active-mode', 'tile-loading', 'tile-error');
-                parcelBtn.title = "Ownership Data";
-            }
-            parcelsOn = !parcelsOn;
-        };
-
-        // GPS
-        let userPin;
-        gpsBtn.onclick = () => map.locate({ setView: true, maxZoom: 17 });
-        map.on('locationfound', (e) => {
-            if (userPin) map.removeLayer(userPin);
-            userPin = L.marker(e.latlng).addTo(map).bindPopup("Current Location").openPopup();
+        btn.addEventListener('click', () => {
+            if (!navigator.geolocation) { setStatus('Location is not supported on this device.'); return; }
+            setBusy(true);
+            setStatus('Finding your location…');
+            navigator.geolocation.getCurrentPosition(onPosition, onGeoError, {
+                enableHighAccuracy: true, timeout: 10000, maximumAge: 60000
+            });
         });
 
-        const searchInput = document.getElementById('searchInput');
-        const searchBtn = document.getElementById('searchBtn');
-        let searchMarker;
-
-        function showSearchError(message) {
-            const popup = L.popup({ closeButton: true, autoClose: true })
-                .setLatLng(map.getCenter())
-                .setContent(`<div style="font-size:14px;color:#333;">${message}</div>`)
-                .openOn(map);
-            setTimeout(() => map.closePopup(popup), 3000);
-        }
-
-        function geocodeQuery(query) {
-            const encoded = encodeURIComponent(query.trim());
-            const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&q=${encoded}&limit=5`;
-
-            searchBtn.disabled = true;
-            searchBtn.textContent = '⏳';
-
-            fetch(url, {
-                headers: {
-                    'Accept': 'application/json',
-                    'User-Agent': 'txparcel.charleslogic.com'
-                }
-            })
-                .then(res => res.json())
-                .then(results => {
-                    searchBtn.disabled = false;
-                    searchBtn.textContent = '🔍';
-
-                    if (!results || !results.length) {
-                        showSearchError('No location found. Try a full address, city, state, landmark, or GPS coordinates.');
-                        return;
-                    }
-
-                    const best = results[0];
-                    const lat = parseFloat(best.lat);
-                    const lon = parseFloat(best.lon);
-
-                    if (searchMarker) map.removeLayer(searchMarker);
-                    searchMarker = L.marker([lat, lon]).addTo(map);
-
-                    const label = best.display_name || query;
-                    searchMarker.bindPopup(`<b>Search result</b><br>${label}`).openPopup();
-                    map.setView([lat, lon], 16);
-                })
-                .catch((err) => {
-                    searchBtn.disabled = false;
-                    searchBtn.textContent = '🔍';
-                    console.error('Geocode error', err);
-                    showSearchError('Search failed. Please try again.');
-                });
-        }
-
-        function parseGpsCoordinates(value) {
-            const gps = value.trim();
-            const gpsPattern = /^\s*([+-]?\d+(?:\.\d+)?)\s*,\s*([+-]?\d+(?:\.\d+)?)\s*$/;
-            const match = gpsPattern.exec(gps);
-            if (!match) return null;
-            const lat = parseFloat(match[1]);
-            const lon = parseFloat(match[2]);
-            if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
-            return { lat, lon };
-        }
-
-        function runSearch() {
-            const query = searchInput.value;
-            if (!query.trim()) {
-                searchInput.focus();
-                return;
-            }
-
-            const coords = parseGpsCoordinates(query);
-            if (coords) {
-                if (searchMarker) map.removeLayer(searchMarker);
-                searchMarker = L.marker([coords.lat, coords.lon]).addTo(map);
-                searchMarker.bindPopup(`<b>GPS Coordinates</b><br>${coords.lat.toFixed(6)}, ${coords.lon.toFixed(6)}`).openPopup();
-                map.setView([coords.lat, coords.lon], 16);
-            } else {
-                geocodeQuery(query);
-            }
-        }
-
-        searchBtn.onclick = runSearch;
-        searchInput.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') runSearch();
-        });
-
-        // 3. Click-to-fetch parcel record
-        map.on('click', function (e) {
-            if (!parcelsOn) return;
-
-            // Spin the button while waiting for the GetFeatureInfo response
-            parcelBtn.classList.remove('active-mode', 'tile-loading', 'tile-error');
-            parcelBtn.classList.add('fetching');
-
-            const size = map.getSize();
-            const bbox = map.getBounds().toBBoxString();
-            const x = Math.floor(map.latLngToContainerPoint(e.latlng).x);
-            const y = Math.floor(map.latLngToContainerPoint(e.latlng).y);
-
-            // FIX: INFO_FORMAT corrected to text/xml — the server returns XML (<FIELDS>), not JSON.
-            const infoUrl = `${wmsUrl}?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetFeatureInfo&LAYERS=0&QUERY_LAYERS=0&BBOX=${bbox}&FEATURE_COUNT=1&HEIGHT=${size.y}&WIDTH=${size.x}&FORMAT=image/png&INFO_FORMAT=text/xml&SRS=EPSG:4326&X=${x}&Y=${y}`;
-
-            fetch(infoUrl)
-                .then(res => res.text())
-                .then(text => {
-                    parcelBtn.classList.remove('fetching');
-                    // Restore steady active glow now that fetch is done
-                    if (parcelsOn) parcelBtn.classList.add('active-mode');
-
-                    if (text.includes('<FIELDS')) {
-                        const parser = new DOMParser();
-                        const xmlDoc = parser.parseFromString(text, "text/xml");
-                        const f = xmlDoc.getElementsByTagName("FIELDS")[0];
-
-                        // Returns a trimmed attribute value, or null if missing/blank
-                        const val = (attr) => {
-                            const v = f.getAttribute(attr);
-                            if (v === null) return null;
-                            const trimmed = v.trim();
-                            return trimmed ? trimmed : null;
-                        };
-
-                        // Returns a numeric attribute value, or null if missing/zero
-                        const num = (attr) => {
-                            const v = val(attr);
-                            if (v === null) return null;
-                            const n = Number(v);
-                            return (isNaN(n) || n === 0) ? null : n;
-                        };
-
-                        const currency = (n) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
-
-                        // Renders "<b>label:</b> value<br>", or '' if value is missing
-                        const row = (label, value, small) =>
-                            value ? `<b>${label}:</b> ${small ? `<small>${value}</small>` : value}<br>` : '';
-
-                        // Renders a money row from a raw attribute, or '' if missing/zero
-                        const moneyRow = (label, attr) => {
-                            const n = num(attr);
-                            return n !== null ? row(label, currency(n)) : '';
-                        };
-
-                        // Renders "label1: v1 | label2: v2 ..." for whichever pairs have values
-                        const joinedRow = (...pairs) => {
-                            const parts = pairs.filter(([, v]) => v).map(([label, v]) => `${label}: ${v}`);
-                            return parts.length ? `${parts.join(' | ')}<br>` : '';
-                        };
-
-                        // North Texas appraisal districts with a known property-search page.
-                        // Dallas additionally supports a direct per-record deep link via PROP_ID.
-                        const CAD_LINKS = {
-                            TARRANT: { name: 'Tarrant Appraisal District', url: 'https://tarrant.prodigycad.com/property-search' },
-                            DALLAS: {
-                                name: 'Dallas CAD',
-                                url: 'https://www.dallascad.org/SearchAcct.aspx',
-                                detailUrl: (propId) => `https://www.dallascad.org/acctDetailRes.aspx?ID=${encodeURIComponent(propId)}`
-                            },
-                            DENTON: { name: 'Denton Central Appraisal District', url: 'https://www.dentoncad.com/property-search' },
-                            COLLIN: { name: 'Collin Central Appraisal District', url: 'https://collincad.org/property-search/' },
-                            JOHNSON: { name: 'Johnson County Appraisal District', url: 'https://esearch.johnsoncad.com/' },
-                            WISE: { name: 'Wise County Appraisal District', url: 'https://esearch.wise-cad.com/' },
-                            ELLIS: { name: 'Ellis Appraisal District', url: 'https://www.elliscad.com/property-search' },
-                            ROCKWALL: { name: 'Rockwall Central Appraisal District', url: 'https://www.rockwallcad.com/property-search' },
-                            KAUFMAN: { name: 'Kaufman Central Appraisal District', url: 'https://esearch.kaufman-cad.org/' },
-                            HUNT: { name: 'Hunt County Appraisal District', url: 'https://hunt-cad.org/property-search/' }
-                        };
-
-                        // Returns { label, url } for a link to the appraisal district for this parcel's county.
-                        // Known counties link to a direct record (if supported) or the CAD's search page;
-                        // unknown counties fall back to a Google search so every parcel still gets a link.
-                        const cadLink = (county, propId) => {
-                            if (!county) return null;
-                            const entry = CAD_LINKS[county.toUpperCase()];
-                            if (entry) {
-                                if (entry.detailUrl && propId) {
-                                    return { label: `View record on ${entry.name} ↗`, url: entry.detailUrl(propId) };
-                                }
-                                return { label: `Search ${entry.name} ↗`, url: entry.url };
-                            }
-                            const titleCase = (s) => s.replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
-                            const query = encodeURIComponent(`${county} County Texas Appraisal District property search`);
-                            return { label: `Search ${titleCase(county)} County Appraisal District ↗`, url: `https://www.google.com/search?q=${query}` };
-                        };
-
-                        const rawDate = val("DATE_ACQ");
-                        const formattedDate = (rawDate && rawDate.length === 8)
-                            ? `${rawDate.substring(4, 6)}/${rawDate.substring(6, 8)}/${rawDate.substring(0, 4)}`
-                            : null;
-
-                        // Texas Comptroller property type codes (Form 50-115 categories)
-                        const LAND_USE_LABELS = {
-                            A1: 'Residential - Single Family', A2: 'Residential - Mobile Home',
-                            B1: 'Multifamily', B2: 'Multifamily', B3: 'Multifamily', B4: 'Multifamily',
-                            C1: 'Vacant Lot/Tract', D1: 'Qualified Open-Space Land',
-                            D2: 'Improvements on Open-Space Land', E: 'Rural Land/Improvements',
-                            F1: 'Commercial', F2: 'Industrial/Manufacturing',
-                            G1: 'Oil, Gas & Mineral Reserves', J: 'Utilities',
-                            L1: 'Commercial Personal Property', M: 'Mobile Home/Personal Property',
-                            O: 'Real Property Inventory', X: 'Exempt Property'
-                        };
-                        const landUseCode = val("STAT_LAND_USE") || val("LOC_LAND_USE");
-                        const landUse = landUseCode
-                            ? (LAND_USE_LABELS[landUseCode] ? `${LAND_USE_LABELS[landUseCode]} (${landUseCode})` : landUseCode)
-                            : null;
-
-                        const legalArea = val("LEGAL_AREA");
-                        const areaStr = legalArea ? `${legalArea}${val("LGL_AREA_UNIT") ? ' ' + val("LGL_AREA_UNIT") : ''}` : null;
-
-                        const situsAddr = val("SITUS_ADDR");
-                        const mailAddr = val("MAIL_ADDR");
-
-                        // Each group renders together; empty groups (and their divider) are dropped
-                        const groups = [
-                            [
-                                row('Owner', val("OWNER_NAME")),
-                                row('Care Of', val("NAME_CARE")),
-                                row('Mailing Address', (mailAddr && mailAddr !== situsAddr) ? mailAddr : null)
-                            ],
-                            [
-                                row('Address', situsAddr),
-                                row('Legal', val("LEGAL_DESC"), true)
-                            ],
-                            [
-                                row('Land Use', landUse),
-                                row('Area', areaStr),
-                                row('Year Built', val("YEAR_BUILT"))
-                            ],
-                            [
-                                moneyRow('Market Value', 'MKT_VALUE'),
-                                moneyRow('Land Value', 'LAND_VALUE'),
-                                moneyRow('Improvement Value', 'IMP_VALUE')
-                            ]
-                        ];
-                        const sections = groups.map(rows => rows.filter(Boolean).join('')).filter(Boolean);
-
-                        const footerRows = [
-                            joinedRow(['Property ID', val("PROP_ID")], ['Geo ID', val("GEO_ID")]),
-                            row('Source', val("SOURCE")),
-                            joinedRow(['County', val("COUNTY")], ['Tax Year', val("TAX_YEAR")], ['Data Date', formattedDate])
-                        ].filter(Boolean).join('');
-
-                        const cad = cadLink(val("COUNTY"), val("PROP_ID"));
-
-                        const divider = '<hr style="border:0; border-top: 1px solid #eee; margin: 8px 0;">';
-
-                        const content = `
-                            <div class="parcel-popup">
-                                <h4>Property Details</h4>
-                                ${sections.join(divider)}
-                                ${(footerRows || cad) ? divider : ''}
-                                ${footerRows ? `<div style="font-size:10px; color:#888;">${footerRows}</div>` : ''}
-                                ${cad ? `<div style="margin-top:6px;"><a href="${cad.url}" target="_blank" rel="noopener" style="font-size:12px; font-weight:600; color:#2563eb; text-decoration:none;">${cad.label}</a></div>` : ''}
-                            </div>
-                        `;
-                        L.popup({ maxWidth: 320, maxHeight: 400 }).setLatLng(e.latlng).setContent(content).openOn(map);
-                    }
+        function onPosition(pos) {
+            const { latitude: lat, longitude: lon } = pos.coords;
+            const url = `https://nominatim.openstreetmap.org/reverse?format=json&zoom=10&addressdetails=1&lat=${lat}&lon=${lon}`;
+            fetch(url, { headers: { 'Accept': 'application/json' } })
+                .then((r) => r.json())
+                .then((data) => {
+                    const addr = (data && data.address) || {};
+                    const county = addr.county || addr.city_district || '';
+                    const file = COUNTY_FILES[countyKey(county)] || STATEWIDE;
+                    setStatus(`Opening ${county ? county : 'the statewide map'}…`);
+                    window.location.href = file;
                 })
                 .catch(() => {
-                    parcelBtn.classList.remove('fetching');
-                    if (parcelsOn) parcelBtn.classList.add('active-mode');
+                    setBusy(false);
+                    setStatus('Couldn’t look up your county — pick one below.');
                 });
-        });
+        }
+
+        function onGeoError() {
+            setBusy(false);
+            setStatus('Location unavailable or permission denied — pick a county below.');
+        }
     </script>
 </body>
 
