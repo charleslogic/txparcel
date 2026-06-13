@@ -212,10 +212,11 @@
             'site_str_num', 'site_str_name', 'site_city', 'site_zip',
             'land_value', 'bld_value', 'impr_value', 'total_appraised_val', 'total_market_val', 'land_sqft'
         ];
-        // HCAD actively blocks deep-linking to individual records (WAF + POST-only,
-        // session-bound search), so "View Details" opens HCAD's working quicksearch;
-        // the 13-digit account is shown in the popup for a quick paste.
-        const getDetailLink = () => 'https://hcad.org/quicksearch/';
+        // HCAD actively blocks deep-linking to individual records (Cloudflare +
+        // server-generated, time-stamped search tokens that can't be built
+        // client-side), so "Look up on HCAD" opens their modern search UI; the
+        // 13-digit account is shown in the popup for a quick paste.
+        const getDetailLink = () => 'https://search.hcad.org/';
 
         const baseLayers = [
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxNativeZoom: 19, maxZoom: 22 }),
