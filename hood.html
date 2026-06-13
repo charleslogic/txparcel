@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Land Owner - Hood</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Land Owner - Hood">
+    <meta name="theme-color" content="#0a1628">
+    <link rel="apple-touch-icon" sizes="180x180" href="hood-icon.png">
+    <link rel="icon" type="image/svg+xml" href="hood-icon.svg">
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #f0f0f0;
+            overflow: hidden;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .custom-control-btn,
+        .leaflet-control-zoom-in,
+        .leaflet-control-zoom-out,
+        .leaflet-control-geocoder-icon {
+            background-color: white !important;
+            width: 54px !important;
+            height: 54px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-size: 26px !important;
+            border-radius: 14px !important;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3) !important;
+            margin-bottom: 12px !important;
+            border: none !important;
+            color: black !important;
+            text-decoration: none !important;
+            transition: all 0.3s ease;
+        }
+
+        .btn-active {
+            background-color: #007bff !important;
+            color: white !important;
+            box-shadow: 0 0 15px rgba(0, 123, 255, 0.8) !important;
+            animation: pulse-glow 2s infinite;
+        }
+
+        .btn-loading {
+            animation: spin 1s linear infinite !important;
+        }
+
+        .control-hidden {
+            display: none !important;
+        }
+
+        @keyframes pulse-glow {
+
+            0%,
+            100% {
+                box-shadow: 0 0 5px rgba(0, 123, 255, 0.6);
+            }
+
+            50% {
+                box-shadow: 0 0 20px rgba(0, 123, 255, 0.9);
+            }
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        #zoom-display {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            color: #222;
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-family: -apple-system, sans-serif;
+            font-size: 12px;
+            font-weight: bold;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+            pointer-events: none;
+            border: 1px solid #ddd;
+        }
+
+        .leaflet-bar {
+            border: none !important;
+            box-shadow: none !important;
+        }
+
+        .leaflet-control-zoom {
+            margin-left: 12px !important;
+            margin-top: 12px !important;
+        }
+
+        .parcel-popup {
+            font-family: -apple-system, sans-serif;
+            min-width: 220px;
+        }
+
+        .action-link {
+            display: block;
+            background: #007bff;
+            color: white !important;
+            text-align: center;
+            padding: 14px;
+            text-decoration: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .vc-delta-label {
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid #888;
+            border-radius: 6px;
+            padding: 2px 5px;
+            font-size: 11px;
+            font-weight: bold;
+            font-family: -apple-system, sans-serif;
+            white-space: nowrap;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #222;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
+        .vc-baseline-label {
+            background: #FFD700;
+            border: 2px solid #b8860b;
+            border-radius: 6px;
+            padding: 2px 6px;
+            font-size: 12px;
+            font-weight: bold;
+            font-family: -apple-system, sans-serif;
+            white-space: nowrap;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #222;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+        }
+
+        .value-label {
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid #007bff;
+            border-radius: 6px;
+            padding: 2px 5px;
+            font-size: 11px;
+            font-weight: bold;
+            font-family: -apple-system, sans-serif;
+            white-space: nowrap;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #0a1628;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="zoom-display">Zoom: 18</div>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/esri-leaflet@3.0.10/dist/esri-leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
+    <script>
+        // 1. HOOD COUNTY CONFIG (HCAD-maintained parcels, ArcGIS Online hosted)
+        const HOOD_URL = 'https://services6.arcgis.com/wHtOhDQeUxQY5fQy/arcgis/rest/services/HCAD_Parcels/FeatureServer/107';
+        const PARCEL_MIN_ZOOM = 16;
+        const VALUE_LABEL_MIN_ZOOM = 18;
+        const queryFields = [
+            'PROP_ID', 'vm_geoid', 'vm_name', 'vm_incare',
+            'vm_situs', 'vm_city', 'vm_state', 'vm_zip',
+            'vm_mkt', 'vm_assd', 'vm_lndmkt', 'vm_impmkt',
+            'vm_acres', 'vm_subd', 'vm_ents', 'vm_saleamt', 'vm_saledt'
+        ];
+
+        // Hood CAD school taxing-unit codes -> ISD names. Other entity codes
+        // (county, road, water, etc.) are ignored; unknown S* codes show raw.
+        const SCHOOL_NAMES = { SGR: 'Granbury ISD', SLI: 'Lipan ISD', STO: 'Tolar ISD' };
+
+        // Hood CAD uses a True Automation eSearch portal keyed by numeric prop id;
+        // PROP_ID here is like "R000000018", so strip the R and leading zeros.
+        const getDetailLink = (props) => {
+            const num = String(props.PROP_ID || '').replace(/^R/i, '').replace(/^0+/, '');
+            return num ? `https://esearch.hoodcad.net/Property/View/${num}` : 'https://esearch.hoodcad.net/';
+        };
+
+        const baseLayers = [
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxNativeZoom: 19, maxZoom: 22 }),
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 19, maxZoom: 22 }),
+            L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 16, maxZoom: 22 })
+        ];
+        let currentBaseIndex = 0;
+
+        const map = L.map('map', { center: [32.4421, -97.7942], zoom: 18, maxZoom: 22, zoomControl: true });
+        map.addLayer(baseLayers[0]);
+
+        const zoomDiv = document.getElementById('zoom-display');
+        map.on('zoomend', () => { zoomDiv.innerHTML = `Zoom: ${map.getZoom()}`; });
+
+        let parcelLayer = null;
+        let isOverlayActive = false;
+        let valueCompareActive = false;
+        let compareLayerGroup = null;
+        let showValuesActive = false;
+        let valuesLayerGroup = null;
+
+        // 2. POPUPS
+        function fmtMoney(n) {
+            return `$${Math.round(Number(n) || 0).toLocaleString()}`;
+        }
+
+        function popupRow(label, value) {
+            if (value === null || value === undefined || value === '') return '';
+            return `<tr><td><b>${label}:</b></td><td>${value}</td></tr>`;
+        }
+
+        function getTotalValue(props) {
+            return Number(props.vm_mkt) || 0;
+        }
+
+        // situs holds the street only; assemble the rest from the city/state/zip parts.
+        function buildAddress(props) {
+            const street = String(props.vm_situs || '').trim();
+            const city = String(props.vm_city || '').trim();
+            const state = String(props.vm_state || '').trim();
+            const zip = String(props.vm_zip || '').trim();
+            const cityLine = [[city, state].filter(Boolean).join(', '), zip].filter(Boolean).join(' ').trim();
+            return [street, cityLine].filter(Boolean).join(', ') || 'N/A';
+        }
+
+        // Pull the school district out of the comma-separated taxing-entity list.
+        function getSchool(props) {
+            const codes = String(props.vm_ents || '').split(/[,\s]+/).map((c) => c.trim()).filter(Boolean);
+            const code = codes.find((c) => /^S/i.test(c));
+            if (!code) return '';
+            return SCHOOL_NAMES[code.toUpperCase()] || code;
+        }
+
+        // Builds the "extra" detail rows shared by both popups, omitting any
+        // field that is blank/zero in the source data.
+        function buildDetailRows(props) {
+            const rows = [];
+
+            const acres = Number(props.vm_acres) || 0;
+            if (acres > 0) {
+                const sqft = Math.round(acres * 43560).toLocaleString();
+                rows.push(popupRow('Lot Size', `${acres.toFixed(3)} ac / ${sqft} sqft`));
+            }
+
+            const totalValue = getTotalValue(props);
+            const landValue = Number(props.vm_lndmkt) || 0;
+            const imprValue = Number(props.vm_impmkt) || 0;
+            if (landValue > 0 || imprValue > 0) {
+                rows.push(popupRow('Land / Improvement', `${fmtMoney(landValue)} / ${fmtMoney(imprValue)}`));
+            }
+
+            // Assessed (capped) value, shown only when it differs from market.
+            const assessed = Number(props.vm_assd) || 0;
+            if (assessed > 0 && Math.round(assessed) !== Math.round(totalValue)) {
+                rows.push(popupRow('Assessed (Capped)', fmtMoney(assessed)));
+            }
+
+            const subdivision = String(props.vm_subd || '').trim();
+            if (subdivision) rows.push(popupRow('Subdivision', subdivision));
+
+            const school = getSchool(props);
+            if (school) rows.push(popupRow('School District', school));
+
+            const saleAmt = Number(props.vm_saleamt) || 0;
+            const saleDt = String(props.vm_saledt || '').trim();
+            if (saleAmt > 0) {
+                rows.push(popupRow('Last Sale', saleDt ? `${fmtMoney(saleAmt)} (${saleDt})` : fmtMoney(saleAmt)));
+            }
+
+            return rows.join('');
+        }
+
+        function buildOwnerName(props) {
+            return String(props.vm_name || '').trim() || 'N/A';
+        }
+
+        function buildParcelPopup(props) {
+            const owner = buildOwnerName(props);
+            const account = props.vm_geoid || props.PROP_ID || 'N/A';
+            const addr = buildAddress(props);
+            const totalValue = getTotalValue(props);
+
+            return `<div class="parcel-popup">
+                <b style="font-size:16px;">${owner}</b><br>
+                <small style="color:#666;">${addr}</small><br>
+                <table style="width:100%; font-size:13px; margin-top:8px; border-top: 1px solid #eee; padding-top:5px;">
+                    <tr><td><b>Acct:</b></td><td>${account}</td></tr>
+                    ${buildDetailRows(props)}
+                    <tr><td><b>Total Value:</b></td><td>${fmtMoney(totalValue)}</td></tr>
+                </table>
+                <a href="${getDetailLink(props)}" target="_blank" class="action-link">View Details</a>
+            </div>`;
+        }
+
+        function formatDelta(delta) {
+            const sign = delta > 0 ? '+' : (delta < 0 ? '-' : '');
+            return `${sign}$${Math.abs(delta).toLocaleString()}`;
+        }
+
+        function buildComparePopup(props, delta) {
+            const owner = buildOwnerName(props);
+            const account = props.vm_geoid || props.PROP_ID || 'N/A';
+            const addr = buildAddress(props);
+            const totalValue = getTotalValue(props);
+            const deltaStr = formatDelta(delta);
+            const deltaColor = delta > 0 ? '#2ecc71' : (delta < 0 ? '#e74c3c' : '#888');
+
+            return `<div class="parcel-popup">
+                <b style="font-size:16px;">${owner}</b><br>
+                <small style="color:#666;">${addr}</small><br>
+                <table style="width:100%; font-size:13px; margin-top:8px; border-top: 1px solid #eee; padding-top:5px;">
+                    <tr><td><b>Acct:</b></td><td>${account}</td></tr>
+                    ${buildDetailRows(props)}
+                    <tr><td><b>Total Value:</b></td><td>${fmtMoney(totalValue)}</td></tr>
+                    <tr><td><b>vs. Selected:</b></td><td style="color:${deltaColor}; font-weight:bold;">${deltaStr}</td></tr>
+                </table>
+                <a href="${getDetailLink(props)}" target="_blank" class="action-link">View Details</a>
+            </div>`;
+        }
+
+        // 3. PARCEL LAYER (perf-hardened: zoom gate, restricted fields, simplified
+        // geometry, canvas rendering, request-error handling)
+        function refreshParcelLayer() {
+            if (!isOverlayActive) return;
+
+            const zoom = map.getZoom();
+            const btn = document.getElementById('tad-btn');
+
+            if (zoom < PARCEL_MIN_ZOOM) {
+                if (parcelLayer) { map.removeLayer(parcelLayer); parcelLayer = null; }
+                clearCompareOverlay();
+                refreshValueLabels();
+                btn.classList.remove('btn-loading');
+                btn.innerHTML = '📋';
+                zoomDiv.innerHTML = `Zoom: ${zoom} (Zoom in to see parcels)`;
+                return;
+            }
+
+            if (parcelLayer) {
+                zoomDiv.innerHTML = `Zoom: ${zoom}`;
+                return;
+            }
+
+            zoomDiv.innerHTML = `Zoom: ${zoom}`;
+            btn.classList.add('btn-loading');
+            btn.innerHTML = '⏳';
+
+            parcelLayer = L.esri.featureLayer({
+                url: HOOD_URL,
+                fields: queryFields,
+                simplifyFactor: 0.35,
+                precision: 5,
+                renderer: L.canvas(),
+                style: () => ({ color: '#007bff', weight: 2, fillOpacity: 0.2 })
+            });
+
+            parcelLayer.on('load', () => {
+                btn.classList.remove('btn-loading');
+                btn.innerHTML = '📋';
+                refreshValueLabels();
+            });
+
+            parcelLayer.on('requesterror', () => {
+                btn.classList.remove('btn-loading');
+                btn.innerHTML = '📋';
+                zoomDiv.innerHTML = `Zoom: ${map.getZoom()} (Load error)`;
+            });
+
+            parcelLayer.bindPopup((l) => buildParcelPopup(l.feature.properties), { maxHeight: 320 });
+            parcelLayer.on('click', onParcelClick);
+
+            parcelLayer.addTo(map);
+        }
+
+        function toggleParcels() {
+            const btn = document.getElementById('tad-btn');
+            isOverlayActive = !isOverlayActive;
+
+            if (!isOverlayActive) {
+                if (parcelLayer) { map.removeLayer(parcelLayer); parcelLayer = null; }
+                clearCompareOverlay();
+                refreshValueLabels();
+                btn.classList.remove('btn-active');
+                btn.innerHTML = '📋';
+                document.getElementById('vc-btn').classList.add('control-hidden');
+                document.getElementById('values-btn').classList.add('control-hidden');
+                return;
+            }
+
+            btn.classList.add('btn-active');
+            document.getElementById('vc-btn').classList.remove('control-hidden');
+            document.getElementById('values-btn').classList.remove('control-hidden');
+            refreshParcelLayer();
+        }
+
+        map.on('moveend zoomend', () => {
+            refreshParcelLayer();
+            refreshValueLabels();
+        });
+
+        // 4. VALUE COMPARE - color all currently-visible parcels by their
+        // market-value delta vs. the selected parcel
+        function onParcelClick(e) {
+            if (valueCompareActive) {
+                runValueCompare(e.layer.feature.properties, e.layer);
+            }
+        }
+
+        function runValueCompare(props, layer) {
+            if (!parcelLayer) return;
+
+            const selectedId = props.PROP_ID;
+            const features = [];
+            parcelLayer.eachActiveFeature((l) => {
+                if (l.feature.properties.PROP_ID === selectedId) return;
+                features.push(l.toGeoJSON());
+            });
+
+            buildCompareOverlay(props, { type: 'FeatureCollection', features }, layer);
+        }
+
+        // Color intensity reflects |delta| as a percentage of the selected
+        // parcel's value, so a $10 difference stays near-white while a
+        // difference of 25%+ of the baseline value reaches full saturation.
+        const COMPARE_PCT_FOR_FULL_COLOR = 0.25;
+
+        function colorForDelta(delta, selectedValue) {
+            if (!selectedValue || selectedValue <= 0) return '#ffffff';
+            const pct = Math.abs(delta) / selectedValue;
+            const t = Math.min(1, pct / COMPARE_PCT_FOR_FULL_COLOR);
+            const target = delta > 0 ? [46, 204, 113] : [231, 76, 60];
+            const mix = (c) => Math.round(255 + (c - 255) * t);
+            return `rgb(${mix(target[0])}, ${mix(target[1])}, ${mix(target[2])})`;
+        }
+
+        function clearCompareOverlay() {
+            if (compareLayerGroup) {
+                map.removeLayer(compareLayerGroup);
+                compareLayerGroup = null;
+            }
+        }
+
+        function addBaselineHighlight(selectedProps, selectedLayer) {
+            const highlight = L.polygon(selectedLayer.getLatLngs(), {
+                color: '#FFD700',
+                weight: 3,
+                fillOpacity: 0,
+                interactive: false
+            });
+            compareLayerGroup.addLayer(highlight);
+
+            const value = getTotalValue(selectedProps);
+            const label = L.marker(selectedLayer.getBounds().getCenter(), {
+                icon: L.divIcon({ className: 'vc-baseline-label', html: fmtMoney(value), iconSize: null }),
+                interactive: false
+            });
+            compareLayerGroup.addLayer(label);
+        }
+
+        function buildCompareOverlay(selectedProps, featureCollection, selectedLayer) {
+            clearCompareOverlay();
+
+            const selectedValue = getTotalValue(selectedProps);
+
+            compareLayerGroup = L.layerGroup();
+
+            const neighborLayer = L.geoJSON(featureCollection, {
+                style: (feature) => {
+                    const val = getTotalValue(feature.properties);
+                    const delta = val - selectedValue;
+                    return { color: '#333', weight: 1, fillColor: colorForDelta(delta, selectedValue), fillOpacity: 0.6 };
+                },
+                onEachFeature: (feature, layer) => {
+                    const val = getTotalValue(feature.properties);
+                    const delta = val - selectedValue;
+
+                    layer.bindPopup(buildComparePopup(feature.properties, delta), { maxHeight: 320 });
+
+                    const label = L.marker(layer.getBounds().getCenter(), {
+                        icon: L.divIcon({ className: 'vc-delta-label', html: formatDelta(delta), iconSize: null }),
+                        interactive: false
+                    });
+                    compareLayerGroup.addLayer(label);
+                }
+            });
+            compareLayerGroup.addLayer(neighborLayer);
+
+            addBaselineHighlight(selectedProps, selectedLayer);
+
+            compareLayerGroup.addTo(map);
+        }
+
+        function toggleValueCompare() {
+            valueCompareActive = !valueCompareActive;
+            const btn = document.getElementById('vc-btn');
+
+            if (valueCompareActive) {
+                btn.classList.add('btn-active');
+            } else {
+                btn.classList.remove('btn-active');
+                clearCompareOverlay();
+            }
+        }
+
+        // 5. SHOW VALUES - label every visible parcel with its total value
+        function refreshValueLabels() {
+            if (valuesLayerGroup) {
+                map.removeLayer(valuesLayerGroup);
+                valuesLayerGroup = null;
+            }
+
+            if (!showValuesActive || !parcelLayer || map.getZoom() < VALUE_LABEL_MIN_ZOOM) return;
+
+            valuesLayerGroup = L.layerGroup();
+            parcelLayer.eachActiveFeature((l) => {
+                const value = getTotalValue(l.feature.properties);
+                const label = L.marker(l.getBounds().getCenter(), {
+                    icon: L.divIcon({ className: 'value-label', html: fmtMoney(value), iconSize: null }),
+                    interactive: false
+                });
+                valuesLayerGroup.addLayer(label);
+            });
+            valuesLayerGroup.addTo(map);
+        }
+
+        function toggleShowValues() {
+            showValuesActive = !showValuesActive;
+            const btn = document.getElementById('values-btn');
+
+            if (showValuesActive) {
+                btn.classList.add('btn-active');
+            } else {
+                btn.classList.remove('btn-active');
+            }
+
+            refreshValueLabels();
+        }
+
+        // 6. CONTROLS
+        L.Control.geocoder({ position: 'topleft', collapsed: true }).addTo(map);
+
+        const FieldControls = L.Control.extend({
+            options: { position: 'topleft' },
+            onAdd: function () {
+                const container = L.DomUtil.create('div');
+                const gpsBtn = L.DomUtil.create('a', 'custom-control-btn', container);
+                gpsBtn.innerHTML = '🎯';
+                gpsBtn.onclick = (e) => { e.preventDefault(); map.locate({ setView: true, maxZoom: 18 }); };
+
+                const cycleBtn = L.DomUtil.create('a', 'custom-control-btn', container);
+                cycleBtn.innerHTML = '🗺️';
+                cycleBtn.onclick = (e) => {
+                    e.preventDefault();
+                    map.removeLayer(baseLayers[currentBaseIndex]);
+                    currentBaseIndex = (currentBaseIndex + 1) % baseLayers.length;
+                    map.addLayer(baseLayers[currentBaseIndex]);
+                };
+
+                const tadBtn = L.DomUtil.create('a', 'custom-control-btn', container);
+                tadBtn.id = "tad-btn";
+                tadBtn.innerHTML = '📋';
+                tadBtn.onclick = (e) => { e.preventDefault(); toggleParcels(); };
+
+                const vcBtn = L.DomUtil.create('a', 'custom-control-btn control-hidden', container);
+                vcBtn.id = "vc-btn";
+                vcBtn.innerHTML = '⚖️';
+                vcBtn.onclick = (e) => { e.preventDefault(); toggleValueCompare(); };
+
+                const valuesBtn = L.DomUtil.create('a', 'custom-control-btn control-hidden', container);
+                valuesBtn.id = "values-btn";
+                valuesBtn.innerHTML = '💰';
+                valuesBtn.onclick = (e) => { e.preventDefault(); toggleShowValues(); };
+
+                return container;
+            }
+        });
+        map.addControl(new FieldControls());
+
+        let userMarker;
+        map.on('locationfound', (e) => {
+            if (userMarker) userMarker.setLatLng(e.latlng);
+            else userMarker = L.marker(e.latlng).addTo(map);
+            if (map.getZoom() < 18) map.setZoom(18);
+        });
+    </script>
+</body>
+
+</html>
