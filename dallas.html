@@ -103,6 +103,33 @@
             border: 1px solid #ddd;
         }
 
+        #vc-mode-wrap {
+            position: absolute;
+            top: 70px;
+            right: 15px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            color: #222;
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-family: -apple-system, sans-serif;
+            font-size: 12px;
+            font-weight: bold;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+            border: 1px solid #ddd;
+            display: none;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        #vc-mode-wrap label.vc-option-label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: normal;
+        }
+
         .leaflet-bar {
             border: none !important;
             box-shadow: none !important;
@@ -174,6 +201,14 @@
             text-align: center;
             color: #0a1628;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+            line-height: 1.2;
+        }
+
+        .value-label-sqft {
+            display: block;
+            font-size: 10px;
+            font-weight: normal;
+            color: #007bff;
         }
     </style>
 </head>
@@ -181,6 +216,16 @@
 <body>
 
     <div id="zoom-display">Zoom: 18</div>
+    <div id="vc-mode-wrap">
+        <label class="vc-option-label" for="vc-metric-total">
+            <input type="radio" name="vc-metric" id="vc-metric-total" checked>
+            Total value
+        </label>
+        <label class="vc-option-label" for="vc-metric-persqft">
+            <input type="radio" name="vc-metric" id="vc-metric-persqft">
+            $/sqft
+        </label>
+    </div>
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -217,6 +262,8 @@
         let isOverlayActive = false;
         let valueCompareActive = false;
         let compareLayerGroup = null;
+        let compareMetric = 'total'; // 'total' | 'persqft'
+        let lastCompare = null;      // remembers the active comparison so the metric toggle can rebuild it
         let showValuesActive = false;
         let valuesLayerGroup = null;
 
@@ -301,13 +348,41 @@
             return `${sign}$${Math.abs(delta).toLocaleString()}`;
         }
 
+        // Value used for the compare overlay's color/delta. Returns null when the
+        // active metric can't be computed for a parcel (e.g. $/sqft with no living area).
+        function getMetricValue(props) {
+            const total = Number(props.CNTASSDVAL) || 0;
+            if (compareMetric === 'persqft') {
+                const living = Number(props.RESFLRAREA) || Number(props.BLDGAREA) || 0;
+                return living > 0 ? total / living : null;
+            }
+            return total;
+        }
+
+        function fmtMetricValue(value) {
+            if (value === null) return 'N/A';
+            return compareMetric === 'persqft' ? `${fmtMoney(value)}/sqft` : fmtMoney(value);
+        }
+
+        const metricLabel = () => (compareMetric === 'persqft' ? '$/sqft' : 'Total value');
+
+        // Metric-aware delta for the compare overlay labels/popups (formatDelta
+        // stays plain for the YoY value-change row in buildDetailRows).
+        function formatMetricDelta(delta) {
+            if (delta === null) return 'N/A';
+            const sign = delta > 0 ? '+' : (delta < 0 ? '-' : '');
+            const abs = Math.round(Math.abs(delta));
+            const suffix = compareMetric === 'persqft' ? '/sqft' : '';
+            return `${sign}$${abs.toLocaleString()}${suffix}`;
+        }
+
         function buildComparePopup(props, delta) {
             const owner = buildOwnerName(props);
             const account = props.PARCELID || 'N/A';
             const addr = props.SITEADDRESS || 'N/A';
             const totalValue = Number(props.CNTASSDVAL) || 0;
-            const deltaStr = formatDelta(delta);
-            const deltaColor = delta > 0 ? '#2ecc71' : (delta < 0 ? '#e74c3c' : '#888');
+            const deltaStr = formatMetricDelta(delta);
+            const deltaColor = delta === null ? '#888' : (delta > 0 ? '#2ecc71' : (delta < 0 ? '#e74c3c' : '#888'));
 
             return `<div class="parcel-popup">
                 <b style="font-size:16px;">${owner}</b><br>
@@ -316,7 +391,7 @@
                     <tr><td><b>Acct:</b></td><td>${account}</td></tr>
                     ${buildDetailRows(props)}
                     <tr><td><b>Total Value:</b></td><td>${fmtMoney(totalValue)}</td></tr>
-                    <tr><td><b>vs. Selected:</b></td><td style="color:${deltaColor}; font-weight:bold;">${deltaStr}</td></tr>
+                    <tr><td><b>vs. Selected (${metricLabel()}):</b></td><td style="color:${deltaColor}; font-weight:bold;">${deltaStr}</td></tr>
                 </table>
                 <a href="${getDetailLink(account)}" target="_blank" class="action-link">View Details</a>
             </div>`;
@@ -388,12 +463,14 @@
                 btn.innerHTML = '📋';
                 document.getElementById('vc-btn').classList.add('control-hidden');
                 document.getElementById('values-btn').classList.add('control-hidden');
+                document.getElementById('vc-mode-wrap').style.display = 'none';
                 return;
             }
 
             btn.classList.add('btn-active');
             document.getElementById('vc-btn').classList.remove('control-hidden');
             document.getElementById('values-btn').classList.remove('control-hidden');
+            if (valueCompareActive) document.getElementById('vc-mode-wrap').style.display = 'flex';
             refreshParcelLayer();
         }
 
@@ -428,7 +505,7 @@
         const COMPARE_PCT_FOR_FULL_COLOR = 0.25;
 
         function colorForDelta(delta, selectedValue) {
-            if (selectedValue <= 0) return '#ffffff';
+            if (delta === null || !selectedValue || selectedValue <= 0) return '#ffffff';
             const pct = Math.abs(delta) / selectedValue;
             const t = Math.min(1, pct / COMPARE_PCT_FOR_FULL_COLOR);
             const target = delta > 0 ? [46, 204, 113] : [231, 76, 60];
@@ -441,6 +518,7 @@
                 map.removeLayer(compareLayerGroup);
                 compareLayerGroup = null;
             }
+            lastCompare = null;
         }
 
         function addBaselineHighlight(selectedProps, selectedLayer) {
@@ -452,9 +530,9 @@
             });
             compareLayerGroup.addLayer(highlight);
 
-            const value = Number(selectedProps.CNTASSDVAL) || 0;
+            const value = getMetricValue(selectedProps);
             const label = L.marker(selectedLayer.getBounds().getCenter(), {
-                icon: L.divIcon({ className: 'vc-baseline-label', html: `$${value.toLocaleString()}`, iconSize: null }),
+                icon: L.divIcon({ className: 'vc-baseline-label', html: fmtMetricValue(value), iconSize: null }),
                 interactive: false
             });
             compareLayerGroup.addLayer(label);
@@ -462,25 +540,26 @@
 
         function buildCompareOverlay(selectedProps, featureCollection, selectedLayer) {
             clearCompareOverlay();
+            lastCompare = { selectedProps, featureCollection, selectedLayer };
 
-            const selectedValue = Number(selectedProps.CNTASSDVAL) || 0;
+            const selectedValue = getMetricValue(selectedProps);
 
             compareLayerGroup = L.layerGroup();
 
             const neighborLayer = L.geoJSON(featureCollection, {
                 style: (feature) => {
-                    const val = Number(feature.properties.CNTASSDVAL) || 0;
-                    const delta = val - selectedValue;
+                    const val = getMetricValue(feature.properties);
+                    const delta = (val === null || selectedValue === null) ? null : val - selectedValue;
                     return { color: '#333', weight: 1, fillColor: colorForDelta(delta, selectedValue), fillOpacity: 0.6 };
                 },
                 onEachFeature: (feature, layer) => {
-                    const val = Number(feature.properties.CNTASSDVAL) || 0;
-                    const delta = val - selectedValue;
+                    const val = getMetricValue(feature.properties);
+                    const delta = (val === null || selectedValue === null) ? null : val - selectedValue;
 
                     layer.bindPopup(buildComparePopup(feature.properties, delta), { maxHeight: 320 });
 
                     const label = L.marker(layer.getBounds().getCenter(), {
-                        icon: L.divIcon({ className: 'vc-delta-label', html: formatDelta(delta), iconSize: null }),
+                        icon: L.divIcon({ className: 'vc-delta-label', html: formatMetricDelta(delta), iconSize: null }),
                         interactive: false
                     });
                     compareLayerGroup.addLayer(label);
@@ -496,14 +575,30 @@
         function toggleValueCompare() {
             valueCompareActive = !valueCompareActive;
             const btn = document.getElementById('vc-btn');
+            const modeWrap = document.getElementById('vc-mode-wrap');
 
             if (valueCompareActive) {
                 btn.classList.add('btn-active');
+                modeWrap.style.display = 'flex';
             } else {
                 btn.classList.remove('btn-active');
+                modeWrap.style.display = 'none';
                 clearCompareOverlay();
             }
         }
+
+        // Switch the overlay metric (total value vs. $/sqft) and rebuild the
+        // current comparison in place, without re-querying the service.
+        function setCompareMetric(metric) {
+            if (compareMetric === metric) return;
+            compareMetric = metric;
+            if (lastCompare) {
+                buildCompareOverlay(lastCompare.selectedProps, lastCompare.featureCollection, lastCompare.selectedLayer);
+            }
+        }
+
+        document.getElementById('vc-metric-total').addEventListener('change', () => setCompareMetric('total'));
+        document.getElementById('vc-metric-persqft').addEventListener('change', () => setCompareMetric('persqft'));
 
         // 5. SHOW VALUES - label every visible parcel with its total value
         function refreshValueLabels() {
@@ -516,9 +611,12 @@
 
             valuesLayerGroup = L.layerGroup();
             parcelLayer.eachActiveFeature((l) => {
-                const value = Number(l.feature.properties.CNTASSDVAL) || 0;
+                const props = l.feature.properties;
+                const value = Number(props.CNTASSDVAL) || 0;
+                const living = Number(props.RESFLRAREA) || Number(props.BLDGAREA) || 0;
+                const perSqft = living > 0 ? `<span class="value-label-sqft">${fmtMoney(value / living)}/sqft</span>` : '';
                 const label = L.marker(l.getBounds().getCenter(), {
-                    icon: L.divIcon({ className: 'value-label', html: fmtMoney(value), iconSize: null }),
+                    icon: L.divIcon({ className: 'value-label', html: `${fmtMoney(value)}${perSqft}`, iconSize: null }),
                     interactive: false
                 });
                 valuesLayerGroup.addLayer(label);
