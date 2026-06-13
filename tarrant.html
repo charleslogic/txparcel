@@ -208,6 +208,14 @@
             text-align: center;
             color: #0a1628;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+            line-height: 1.2;
+        }
+
+        .value-label-sqft {
+            display: block;
+            font-size: 10px;
+            font-weight: normal;
+            color: #007bff;
         }
     </style>
 </head>
@@ -670,9 +678,12 @@
 
             valuesLayerGroup = L.layerGroup();
             parcelLayer.eachActiveFeature((l) => {
-                const value = Number(l.feature.properties.TOTAL_VALU) || 0;
+                const props = l.feature.properties;
+                const value = Number(props.TOTAL_VALU) || 0;
+                const living = Number(props.LIVING_ARE) || 0;
+                const perSqft = living > 0 ? `<span class="value-label-sqft">${fmtMoney(value / living)}/sqft</span>` : '';
                 const label = L.marker(l.getBounds().getCenter(), {
-                    icon: L.divIcon({ className: 'value-label', html: fmtMoney(value), iconSize: null }),
+                    icon: L.divIcon({ className: 'value-label', html: `${fmtMoney(value)}${perSqft}`, iconSize: null }),
                     interactive: false
                 });
                 valuesLayerGroup.addLayer(label);
