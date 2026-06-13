@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Land Owner - Harris</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Land Owner - Harris">
+    <meta name="theme-color" content="#0a1628">
+    <link rel="apple-touch-icon" sizes="180x180" href="harris-icon.png">
+    <link rel="icon" type="image/svg+xml" href="harris-icon.svg">
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #f0f0f0;
+            overflow: hidden;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .custom-control-btn,
+        .leaflet-control-zoom-in,
+        .leaflet-control-zoom-out,
+        .leaflet-control-geocoder-icon {
+            background-color: white !important;
+            width: 54px !important;
+            height: 54px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-size: 26px !important;
+            border-radius: 14px !important;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3) !important;
+            margin-bottom: 12px !important;
+            border: none !important;
+            color: black !important;
+            text-decoration: none !important;
+            transition: all 0.3s ease;
+        }
+
+        .btn-active {
+            background-color: #007bff !important;
+            color: white !important;
+            box-shadow: 0 0 15px rgba(0, 123, 255, 0.8) !important;
+            animation: pulse-glow 2s infinite;
+        }
+
+        .btn-loading {
+            animation: spin 1s linear infinite !important;
+        }
+
+        .control-hidden {
+            display: none !important;
+        }
+
+        @keyframes pulse-glow {
+
+            0%,
+            100% {
+                box-shadow: 0 0 5px rgba(0, 123, 255, 0.6);
+            }
+
+            50% {
+                box-shadow: 0 0 20px rgba(0, 123, 255, 0.9);
+            }
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        #zoom-display {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            color: #222;
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-family: -apple-system, sans-serif;
+            font-size: 12px;
+            font-weight: bold;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+            pointer-events: none;
+            border: 1px solid #ddd;
+        }
+
+        .leaflet-bar {
+            border: none !important;
+            box-shadow: none !important;
+        }
+
+        .leaflet-control-zoom {
+            margin-left: 12px !important;
+            margin-top: 12px !important;
+        }
+
+        .parcel-popup {
+            font-family: -apple-system, sans-serif;
+            min-width: 220px;
+        }
+
+        .action-link {
+            display: block;
+            background: #007bff;
+            color: white !important;
+            text-align: center;
+            padding: 14px;
+            text-decoration: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .vc-delta-label {
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid #888;
+            border-radius: 6px;
+            padding: 2px 5px;
+            font-size: 11px;
+            font-weight: bold;
+            font-family: -apple-system, sans-serif;
+            white-space: nowrap;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #222;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
+        .vc-baseline-label {
+            background: #FFD700;
+            border: 2px solid #b8860b;
+            border-radius: 6px;
+            padding: 2px 6px;
+            font-size: 12px;
+            font-weight: bold;
+            font-family: -apple-system, sans-serif;
+            white-space: nowrap;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #222;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+        }
+
+        .value-label {
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid #007bff;
+            border-radius: 6px;
+            padding: 2px 5px;
+            font-size: 11px;
+            font-weight: bold;
+            font-family: -apple-system, sans-serif;
+            white-space: nowrap;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #0a1628;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+            line-height: 1.2;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="zoom-display">Zoom: 18</div>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/esri-leaflet@3.0.10/dist/esri-leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
+    <script>
+        // 0. CONTROL ICONS (inline stroke SVGs, inherit button color via currentColor)
+        const svgIcon = (p) => `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+        const ICONS = {
+            locate: svgIcon('<line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><circle cx="12" cy="12" r="7"/>'),
+            layers: svgIcon('<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>'),
+            parcels: svgIcon('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>'),
+            loading: svgIcon('<line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>'),
+            scale: svgIcon('<path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>'),
+            values: svgIcon('<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>')
+        };
+
+        // 1. HARRIS COUNTY CONFIG (HCAD Parcels layer, values carried inline)
+        // Min zoom is bumped to 17 here: Harris is dense (downtown Houston can
+        // exceed the 1000-record cap), so we gate parcels a step tighter.
+        const HARRIS_URL = 'https://www.gis.hctx.net/arcgis/rest/services/HCAD/Parcels/MapServer/0';
+        const PARCEL_MIN_ZOOM = 17;
+        const VALUE_LABEL_MIN_ZOOM = 18;
+        const queryFields = [
+            'OBJECTID', 'HCAD_NUM', 'acct_num',
+            'owner_name_1', 'owner_name_2', 'owner_name_3',
+            'site_str_num', 'site_str_name', 'site_city', 'site_zip',
+            'land_value', 'bld_value', 'impr_value', 'total_appraised_val', 'total_market_val', 'land_sqft'
+        ];
+        // HCAD actively blocks deep-linking to individual records (WAF + POST-only,
+        // session-bound search), so "View Details" opens HCAD's working quicksearch;
+        // the 13-digit account is shown in the popup for a quick paste.
+        const getDetailLink = () => 'https://hcad.org/quicksearch/';
+
+        const baseLayers = [
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxNativeZoom: 19, maxZoom: 22 }),
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 19, maxZoom: 22 }),
+            L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 16, maxZoom: 22 })
+        ];
+        let currentBaseIndex = 0;
+
+        const map = L.map('map', { center: [29.7604, -95.3698], zoom: 18, maxZoom: 22, zoomControl: true });
+        map.addLayer(baseLayers[0]);
+
+        const zoomDiv = document.getElementById('zoom-display');
+        map.on('zoomend', () => { zoomDiv.innerHTML = `Zoom: ${map.getZoom()}`; });
+
+        let parcelLayer = null;
+        let isOverlayActive = false;
+        let valueCompareActive = false;
+        let compareLayerGroup = null;
+        let lastCompare = null;      // remembers the active comparison so it can be rebuilt in place
+        let showValuesActive = false;
+        let valuesLayerGroup = null;
+
+        // 2. POPUPS
+        function fmtMoney(n) {
+            return `$${Math.round(Number(n) || 0).toLocaleString()}`;
+        }
+
+        function popupRow(label, value) {
+            if (value === null || value === undefined || value === '') return '';
+            return `<tr><td><b>${label}:</b></td><td>${value}</td></tr>`;
+        }
+
+        // Owner-facing market value for a parcel.
+        function getTotalValue(props) {
+            return Number(props.total_market_val) || 0;
+        }
+
+        // Assemble HCAD's split address parts into one line: "13731 OLEOKE, HOUSTON 77015".
+        function getAddress(props) {
+            const street = [props.site_str_num, props.site_str_name]
+                .filter((v) => v !== null && v !== undefined && String(v).trim() !== '')
+                .join(' ');
+            const cityZip = [props.site_city, props.site_zip].filter(Boolean).join(' ');
+            return [street, cityZip].filter((s) => s && s.trim()).join(', ').replace(/\s+/g, ' ').trim() || 'N/A';
+        }
+
+        // Builds the "extra" detail rows shared by both popups, omitting any
+        // field that is blank/zero in the source data.
+        function buildDetailRows(props) {
+            const rows = [];
+
+            // Lot size: HCAD's Acreage field is usually null, so derive from land_sqft.
+            const lotSqft = Number(props.land_sqft) || 0;
+            if (lotSqft > 0) {
+                const acres = lotSqft / 43560;
+                rows.push(popupRow('Lot Size', `${acres.toFixed(3)} ac / ${Math.round(lotSqft).toLocaleString()} sqft`));
+            }
+
+            const landValue = Number(props.land_value) || 0;
+            const imprValue = Number(props.impr_value) || Number(props.bld_value) || 0;
+            if (landValue > 0 || imprValue > 0) {
+                rows.push(popupRow('Land / Improvement', `${fmtMoney(landValue)} / ${fmtMoney(imprValue)}`));
+            }
+
+            // Appraised (capped) value, shown only when it differs from market.
+            const totalValue = getTotalValue(props);
+            const appraised = Number(props.total_appraised_val) || 0;
+            if (appraised > 0 && Math.round(appraised) !== Math.round(totalValue)) {
+                rows.push(popupRow('Appraised (Capped)', fmtMoney(appraised)));
+            }
+
+            return rows.join('');
+        }
+
+        function buildOwnerName(props) {
+            return [props.owner_name_1, props.owner_name_2, props.owner_name_3]
+                .map((n) => String(n || '').trim())
+                .filter(Boolean)
+                .join(' / ') || 'N/A';
+        }
+
+        function buildParcelPopup(props) {
+            const owner = buildOwnerName(props);
+            const account = props.acct_num || props.HCAD_NUM || 'N/A';
+            const addr = getAddress(props);
+            const totalValue = getTotalValue(props);
+
+            return `<div class="parcel-popup">
+                <b style="font-size:16px;">${owner}</b><br>
+                <small style="color:#666;">${addr}</small><br>
+                <table style="width:100%; font-size:13px; margin-top:8px; border-top: 1px solid #eee; padding-top:5px;">
+                    <tr><td><b>Acct:</b></td><td>${account}</td></tr>
+                    ${buildDetailRows(props)}
+                    <tr><td><b>Total Value:</b></td><td>${fmtMoney(totalValue)}</td></tr>
+                </table>
+                <a href="${getDetailLink()}" target="_blank" class="action-link">Look up on HCAD</a>
+            </div>`;
+        }
+
+        // Total-value delta for the compare overlay labels/popups.
+        function formatDelta(delta) {
+            if (delta === null) return 'N/A';
+            const sign = delta > 0 ? '+' : (delta < 0 ? '-' : '');
+            const abs = Math.round(Math.abs(delta));
+            return `${sign}$${abs.toLocaleString()}`;
+        }
+
+        function buildComparePopup(props, delta) {
+            const owner = buildOwnerName(props);
+            const account = props.acct_num || props.HCAD_NUM || 'N/A';
+            const addr = getAddress(props);
+            const totalValue = getTotalValue(props);
+            const deltaStr = formatDelta(delta);
+            const deltaColor = delta === null ? '#888' : (delta > 0 ? '#2ecc71' : (delta < 0 ? '#e74c3c' : '#888'));
+
+            return `<div class="parcel-popup">
+                <b style="font-size:16px;">${owner}</b><br>
+                <small style="color:#666;">${addr}</small><br>
+                <table style="width:100%; font-size:13px; margin-top:8px; border-top: 1px solid #eee; padding-top:5px;">
+                    <tr><td><b>Acct:</b></td><td>${account}</td></tr>
+                    ${buildDetailRows(props)}
+                    <tr><td><b>Total Value:</b></td><td>${fmtMoney(totalValue)}</td></tr>
+                    <tr><td><b>vs. Selected:</b></td><td style="color:${deltaColor}; font-weight:bold;">${deltaStr}</td></tr>
+                </table>
+                <a href="${getDetailLink()}" target="_blank" class="action-link">Look up on HCAD</a>
+            </div>`;
+        }
+
+        // 3. PARCEL LAYER (perf-hardened: zoom gate, restricted fields, simplified
+        // geometry, canvas rendering, request-error handling)
+        function refreshParcelLayer() {
+            if (!isOverlayActive) return;
+
+            const zoom = map.getZoom();
+            const btn = document.getElementById('tad-btn');
+
+            if (zoom < PARCEL_MIN_ZOOM) {
+                if (parcelLayer) { map.removeLayer(parcelLayer); parcelLayer = null; }
+                clearCompareOverlay();
+                refreshValueLabels();
+                btn.classList.remove('btn-loading');
+                btn.innerHTML = ICONS.parcels;
+                zoomDiv.innerHTML = `Zoom: ${zoom} (Zoom in to see parcels)`;
+                return;
+            }
+
+            if (parcelLayer) {
+                zoomDiv.innerHTML = `Zoom: ${zoom}`;
+                return;
+            }
+
+            zoomDiv.innerHTML = `Zoom: ${zoom}`;
+            btn.classList.add('btn-loading');
+            btn.innerHTML = ICONS.loading;
+
+            parcelLayer = L.esri.featureLayer({
+                url: HARRIS_URL,
+                fields: queryFields,
+                simplifyFactor: 0.35,
+                precision: 5,
+                renderer: L.canvas(),
+                style: () => ({ color: '#007bff', weight: 2, fillOpacity: 0.2 })
+            });
+
+            parcelLayer.on('load', () => {
+                btn.classList.remove('btn-loading');
+                btn.innerHTML = ICONS.parcels;
+                refreshValueLabels();
+            });
+
+            parcelLayer.on('requesterror', () => {
+                btn.classList.remove('btn-loading');
+                btn.innerHTML = ICONS.parcels;
+                zoomDiv.innerHTML = `Zoom: ${map.getZoom()} (Load error)`;
+            });
+
+            parcelLayer.bindPopup((l) => buildParcelPopup(l.feature.properties), { maxHeight: 320 });
+            parcelLayer.on('click', onParcelClick);
+
+            parcelLayer.addTo(map);
+        }
+
+        function toggleParcels() {
+            const btn = document.getElementById('tad-btn');
+            isOverlayActive = !isOverlayActive;
+
+            if (!isOverlayActive) {
+                if (parcelLayer) { map.removeLayer(parcelLayer); parcelLayer = null; }
+                clearCompareOverlay();
+                refreshValueLabels();
+                btn.classList.remove('btn-active');
+                btn.innerHTML = ICONS.parcels;
+                document.getElementById('vc-btn').classList.add('control-hidden');
+                document.getElementById('values-btn').classList.add('control-hidden');
+                return;
+            }
+
+            btn.classList.add('btn-active');
+            document.getElementById('vc-btn').classList.remove('control-hidden');
+            document.getElementById('values-btn').classList.remove('control-hidden');
+            refreshParcelLayer();
+        }
+
+        map.on('moveend zoomend', () => {
+            refreshParcelLayer();
+            refreshValueLabels();
+        });
+
+        // 4. VALUE COMPARE - color all currently-visible parcels by their
+        // market-value delta vs. the selected parcel
+        function onParcelClick(e) {
+            if (valueCompareActive) {
+                runValueCompare(e.layer.feature.properties, e.layer);
+            }
+        }
+
+        function runValueCompare(props, layer) {
+            if (!parcelLayer) return;
+
+            const features = [];
+            parcelLayer.eachActiveFeature((l) => {
+                if (l.feature.properties.acct_num === props.acct_num) return;
+                features.push(l.toGeoJSON());
+            });
+
+            buildCompareOverlay(props, { type: 'FeatureCollection', features }, layer);
+        }
+
+        // Color intensity reflects |delta| as a percentage of the selected
+        // parcel's value, so a small difference stays near-white while a
+        // difference of 25%+ of the baseline value reaches full saturation.
+        const COMPARE_PCT_FOR_FULL_COLOR = 0.25;
+
+        function colorForDelta(delta, selectedValue) {
+            if (delta === null || !selectedValue || selectedValue <= 0) return '#ffffff';
+            const pct = Math.abs(delta) / selectedValue;
+            const t = Math.min(1, pct / COMPARE_PCT_FOR_FULL_COLOR);
+            const target = delta > 0 ? [46, 204, 113] : [231, 76, 60];
+            const mix = (c) => Math.round(255 + (c - 255) * t);
+            return `rgb(${mix(target[0])}, ${mix(target[1])}, ${mix(target[2])})`;
+        }
+
+        function clearCompareOverlay() {
+            if (compareLayerGroup) {
+                map.removeLayer(compareLayerGroup);
+                compareLayerGroup = null;
+            }
+            lastCompare = null;
+        }
+
+        function addBaselineHighlight(selectedProps, selectedLayer) {
+            const highlight = L.polygon(selectedLayer.getLatLngs(), {
+                color: '#FFD700',
+                weight: 3,
+                fillOpacity: 0,
+                interactive: false
+            });
+            compareLayerGroup.addLayer(highlight);
+
+            const value = getTotalValue(selectedProps);
+            const label = L.marker(selectedLayer.getBounds().getCenter(), {
+                icon: L.divIcon({ className: 'vc-baseline-label', html: fmtMoney(value), iconSize: null }),
+                interactive: false
+            });
+            compareLayerGroup.addLayer(label);
+        }
+
+        function buildCompareOverlay(selectedProps, featureCollection, selectedLayer) {
+            clearCompareOverlay();
+            lastCompare = { selectedProps, featureCollection, selectedLayer };
+
+            const selectedValue = getTotalValue(selectedProps);
+
+            compareLayerGroup = L.layerGroup();
+
+            const neighborLayer = L.geoJSON(featureCollection, {
+                style: (feature) => {
+                    const val = getTotalValue(feature.properties);
+                    const delta = val - selectedValue;
+                    return { color: '#333', weight: 1, fillColor: colorForDelta(delta, selectedValue), fillOpacity: 0.6 };
+                },
+                onEachFeature: (feature, layer) => {
+                    const val = getTotalValue(feature.properties);
+                    const delta = val - selectedValue;
+
+                    layer.bindPopup(buildComparePopup(feature.properties, delta), { maxHeight: 320 });
+
+                    const label = L.marker(layer.getBounds().getCenter(), {
+                        icon: L.divIcon({ className: 'vc-delta-label', html: formatDelta(delta), iconSize: null }),
+                        interactive: false
+                    });
+                    compareLayerGroup.addLayer(label);
+                }
+            });
+            compareLayerGroup.addLayer(neighborLayer);
+
+            addBaselineHighlight(selectedProps, selectedLayer);
+
+            compareLayerGroup.addTo(map);
+        }
+
+        function toggleValueCompare() {
+            valueCompareActive = !valueCompareActive;
+            const btn = document.getElementById('vc-btn');
+
+            if (valueCompareActive) {
+                btn.classList.add('btn-active');
+            } else {
+                btn.classList.remove('btn-active');
+                clearCompareOverlay();
+            }
+        }
+
+        // 5. SHOW VALUES - label every visible parcel with its total value
+        function refreshValueLabels() {
+            if (valuesLayerGroup) {
+                map.removeLayer(valuesLayerGroup);
+                valuesLayerGroup = null;
+            }
+
+            if (!showValuesActive || !parcelLayer || map.getZoom() < VALUE_LABEL_MIN_ZOOM) return;
+
+            valuesLayerGroup = L.layerGroup();
+            parcelLayer.eachActiveFeature((l) => {
+                const props = l.feature.properties;
+                const value = getTotalValue(props);
+                const label = L.marker(l.getBounds().getCenter(), {
+                    icon: L.divIcon({ className: 'value-label', html: fmtMoney(value), iconSize: null }),
+                    interactive: false
+                });
+                valuesLayerGroup.addLayer(label);
+            });
+            valuesLayerGroup.addTo(map);
+        }
+
+        function toggleShowValues() {
+            showValuesActive = !showValuesActive;
+            const btn = document.getElementById('values-btn');
+
+            if (showValuesActive) {
+                btn.classList.add('btn-active');
+            } else {
+                btn.classList.remove('btn-active');
+            }
+
+            refreshValueLabels();
+        }
+
+        // 6. CONTROLS
+        L.Control.geocoder({ position: 'topleft', collapsed: true }).addTo(map);
+
+        const FieldControls = L.Control.extend({
+            options: { position: 'topleft' },
+            onAdd: function () {
+                const container = L.DomUtil.create('div');
+                const gpsBtn = L.DomUtil.create('a', 'custom-control-btn', container);
+                gpsBtn.innerHTML = ICONS.locate;
+                gpsBtn.onclick = (e) => { e.preventDefault(); map.locate({ setView: true, maxZoom: 18 }); };
+
+                const cycleBtn = L.DomUtil.create('a', 'custom-control-btn', container);
+                cycleBtn.innerHTML = ICONS.layers;
+                cycleBtn.onclick = (e) => {
+                    e.preventDefault();
+                    map.removeLayer(baseLayers[currentBaseIndex]);
+                    currentBaseIndex = (currentBaseIndex + 1) % baseLayers.length;
+                    map.addLayer(baseLayers[currentBaseIndex]);
+                };
+
+                const tadBtn = L.DomUtil.create('a', 'custom-control-btn', container);
+                tadBtn.id = "tad-btn";
+                tadBtn.innerHTML = ICONS.parcels;
+                tadBtn.onclick = (e) => { e.preventDefault(); toggleParcels(); };
+
+                const vcBtn = L.DomUtil.create('a', 'custom-control-btn control-hidden', container);
+                vcBtn.id = "vc-btn";
+                vcBtn.innerHTML = ICONS.scale;
+                vcBtn.onclick = (e) => { e.preventDefault(); toggleValueCompare(); };
+
+                const valuesBtn = L.DomUtil.create('a', 'custom-control-btn control-hidden', container);
+                valuesBtn.id = "values-btn";
+                valuesBtn.innerHTML = ICONS.values;
+                valuesBtn.onclick = (e) => { e.preventDefault(); toggleShowValues(); };
+
+                return container;
+            }
+        });
+        map.addControl(new FieldControls());
+
+        let userMarker;
+        map.on('locationfound', (e) => {
+            if (userMarker) userMarker.setLatLng(e.latlng);
+            else userMarker = L.marker(e.latlng).addTo(map);
+            if (map.getZoom() < 18) map.setZoom(18);
+        });
+    </script>
+</body>
+
+</html>
