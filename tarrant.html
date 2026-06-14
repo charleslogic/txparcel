@@ -107,6 +107,9 @@
             position: absolute;
             top: 70px;
             right: 15px;
+            /* Cap the width so the card never slides under the left control
+               column (zoom/search/layers sit ~12px in, ~46px wide). */
+            max-width: calc(100vw - 90px);
             z-index: 1000;
             background: rgba(255, 255, 255, 0.95);
             color: #222;
@@ -118,7 +121,7 @@
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
             border: 1px solid #ddd;
             display: none;
-            align-items: center;
+            align-items: flex-start;
             flex-wrap: wrap;
             gap: 6px;
         }
