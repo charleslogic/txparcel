@@ -504,6 +504,7 @@
                 btn.classList.remove('btn-loading');
                 btn.innerHTML = ICONS.parcels;
                 refreshValueLabels();
+                refreshCompareOverlay();
             });
 
             parcelLayer.on('requesterror', () => {
@@ -566,6 +567,9 @@
 
         function runValueCompare(props, layer) {
             const requestId = ++compareRequestId;
+            // Capture the baseline geometry as GeoJSON so its highlight can be
+            // redrawn on pan/zoom even after the live parcel layer drops it.
+            const selectedFeature = layer.toGeoJSON();
 
             if (document.getElementById('vc-all-visible').checked) {
                 if (!parcelLayer) return;
@@ -576,7 +580,7 @@
                     features.push(l.toGeoJSON());
                 });
 
-                buildCompareOverlay(props, { type: 'FeatureCollection', features }, layer);
+                buildCompareOverlay(props, { type: 'FeatureCollection', features }, selectedFeature);
                 return;
             }
 
@@ -592,7 +596,7 @@
                     vcBtn.classList.remove('btn-loading');
                     if (requestId !== compareRequestId) return;
                     if (error) { console.error('Value Compare query failed', error); return; }
-                    buildCompareOverlay(props, featureCollection, layer);
+                    buildCompareOverlay(props, featureCollection, selectedFeature);
                 });
         }
 
@@ -618,26 +622,24 @@
             lastCompare = null;
         }
 
-        function addBaselineHighlight(selectedProps, selectedLayer) {
-            const highlight = L.polygon(selectedLayer.getLatLngs(), {
-                color: '#FFD700',
-                weight: 3,
-                fillOpacity: 0,
-                interactive: false
+        function addBaselineHighlight(selectedProps, selectedFeature) {
+            const highlight = L.geoJSON(selectedFeature, {
+                interactive: false,
+                style: { color: '#FFD700', weight: 3, fillOpacity: 0 }
             });
             compareLayerGroup.addLayer(highlight);
 
             const value = getMetricValue(selectedProps);
-            const label = L.marker(selectedLayer.getBounds().getCenter(), {
+            const label = L.marker(highlight.getBounds().getCenter(), {
                 icon: L.divIcon({ className: 'vc-baseline-label', html: fmtMetricValue(value), iconSize: null }),
                 interactive: false
             });
             compareLayerGroup.addLayer(label);
         }
 
-        function buildCompareOverlay(selectedProps, featureCollection, selectedLayer) {
+        function buildCompareOverlay(selectedProps, featureCollection, selectedFeature) {
             clearCompareOverlay();
-            lastCompare = { selectedProps, featureCollection, selectedLayer };
+            lastCompare = { selectedProps, featureCollection, selectedFeature };
 
             const selectedValue = getMetricValue(selectedProps);
 
@@ -664,9 +666,27 @@
             });
             compareLayerGroup.addLayer(neighborLayer);
 
-            addBaselineHighlight(selectedProps, selectedLayer);
+            addBaselineHighlight(selectedProps, selectedFeature);
 
             compareLayerGroup.addTo(map);
+        }
+
+        // In "All visible parcels" mode, rebuild the comparison whenever new
+        // parcels load (pan/zoom) so freshly revealed parcels get colored and
+        // labeled against the same baseline instead of staying blank. "Entire
+        // street" mode already fetches the whole street, so it needs no refresh.
+        function refreshCompareOverlay() {
+            if (!valueCompareActive || !lastCompare || !parcelLayer) return;
+            if (!document.getElementById('vc-all-visible').checked) return;
+
+            const baselineProps = lastCompare.selectedProps;
+            const baselineFeature = lastCompare.selectedFeature;
+            const features = [];
+            parcelLayer.eachActiveFeature((l) => {
+                if (l.feature.properties.ACCOUNT === baselineProps.ACCOUNT) return;
+                features.push(l.toGeoJSON());
+            });
+            buildCompareOverlay(baselineProps, { type: 'FeatureCollection', features }, baselineFeature);
         }
 
         function toggleValueCompare() {
@@ -690,7 +710,7 @@
             if (compareMetric === metric) return;
             compareMetric = metric;
             if (lastCompare) {
-                buildCompareOverlay(lastCompare.selectedProps, lastCompare.featureCollection, lastCompare.selectedLayer);
+                buildCompareOverlay(lastCompare.selectedProps, lastCompare.featureCollection, lastCompare.selectedFeature);
             }
         }
 
