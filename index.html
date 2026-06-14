@@ -65,6 +65,37 @@
             font-size: 14px;
         }
 
+        .guide-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 12px;
+            padding: 8px 14px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            color: var(--ink);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+            transition: border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .guide-link:hover {
+            border-color: var(--accent);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .guide-link svg {
+            width: 16px;
+            height: 16px;
+            stroke: var(--accent);
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
         .locate {
             display: flex;
             align-items: center;
@@ -166,6 +197,10 @@
             <img src="txparcel-icon.svg" alt="Texas Land Maps" />
             <h1>Texas Land Maps</h1>
             <p>Choose a county appraisal map</p>
+            <a class="guide-link" href="guide.html">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                How these maps work
+            </a>
         </header>
 
         <button class="locate" id="locateBtn" type="button">📍 Use my location</button>

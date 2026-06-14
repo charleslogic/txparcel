@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0a1628">
+    <link rel="apple-touch-icon" sizes="180x180" href="txparcel-icon.png">
+    <link rel="icon" type="image/svg+xml" href="txparcel-icon.svg">
+    <title>How the County Maps Work — Texas Land Maps</title>
+    <style>
+        :root {
+            --accent: #007bff;
+            --ink: #0a1628;
+            --muted: #5a6b7b;
+            --line: #e2e8ef;
+            --bg: #f5f7fa;
+            --card: #ffffff;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--ink);
+            line-height: 1.6;
+        }
+
+        .topbar {
+            background: linear-gradient(180deg, #1e3a5f 0%, #0a1628 100%);
+            color: #e8eef6;
+            padding: max(20px, env(safe-area-inset-top)) 20px 22px;
+            text-align: center;
+        }
+
+        .topbar img {
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+        }
+
+        .topbar h1 {
+            margin: 10px 0 4px;
+            font-size: 1.4rem;
+        }
+
+        .topbar p {
+            margin: 0;
+            color: #9fb2c8;
+            font-size: 0.9rem;
+        }
+
+        .back {
+            display: inline-block;
+            margin-top: 14px;
+            color: #cfe0ff;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .back:hover { color: #fff; }
+
+        .wrap {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 24px 18px calc(56px + env(safe-area-inset-bottom));
+        }
+
+        .lead {
+            color: var(--muted);
+            margin: 0 0 22px;
+        }
+
+        section {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 20px 22px;
+            margin-bottom: 18px;
+            box-shadow: 0 1px 3px rgba(10, 22, 40, 0.05);
+        }
+
+        h2 {
+            font-size: 1.15rem;
+            margin: 0 0 14px;
+        }
+
+        h3 {
+            font-size: 1rem;
+            margin: 18px 0 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        p { margin: 0 0 12px; }
+        ol, ul { margin: 0 0 12px; padding-left: 22px; }
+        li { margin-bottom: 6px; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 4px 0;
+        }
+
+        td {
+            padding: 9px 8px;
+            border-bottom: 1px solid var(--line);
+            vertical-align: middle;
+        }
+
+        tr:last-child td { border-bottom: none; }
+
+        .ic { width: 44px; text-align: center; }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            border-radius: 7px;
+            background: #eef4ff;
+            border: 1px solid #cfe0ff;
+        }
+
+        .badge svg {
+            width: 18px;
+            height: 18px;
+            stroke: var(--accent);
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .tool-name { font-weight: 600; }
+
+        .callout {
+            border-left: 4px solid var(--accent);
+            background: #f0f6ff;
+            padding: 12px 14px;
+            border-radius: 0 8px 8px 0;
+            margin: 14px 0;
+        }
+
+        .callout strong { color: var(--accent); }
+
+        .tip {
+            border-left: 4px solid #f0a500;
+            background: #fff8e8;
+            padding: 12px 14px;
+            border-radius: 0 8px 8px 0;
+            margin: 14px 0;
+            font-size: 0.95rem;
+        }
+
+        .tldr {
+            background: var(--ink);
+            color: #fff;
+            border: none;
+        }
+
+        .tldr h2 { color: #fff; }
+
+        .step-tag {
+            display: inline-block;
+            min-width: 22px;
+            height: 22px;
+            line-height: 22px;
+            text-align: center;
+            background: var(--accent);
+            color: #fff;
+            border-radius: 50%;
+            font-size: 0.8rem;
+            font-weight: 700;
+            margin-right: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <header class="topbar">
+        <img src="txparcel-icon.svg" alt="Texas Land Maps" />
+        <h1>How the County Maps Work</h1>
+        <p>Every county map works the same way — here's what to expect.</p>
+        <a class="back" href="index.html">&larr; Back to maps</a>
+    </header>
+
+    <div class="wrap">
+        <p class="lead">Pick any county from the home screen and you'll land on an interactive appraisal map. Each one shares the same set of tools and controls described below. (Inside any map, the <strong>?</strong> button opens this same guide.)</p>
+
+        <section>
+            <h2>The control buttons</h2>
+            <p>The buttons stack in the <strong>top-left corner</strong> of the map. You start with three, plus a help button:</p>
+            <table>
+                <tr>
+                    <td class="ic"><span class="badge"><svg viewBox="0 0 24 24"><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><circle cx="12" cy="12" r="7"/></svg></span></td>
+                    <td><span class="tool-name">Locate me</span> — jumps the map to your GPS location.</td>
+                </tr>
+                <tr>
+                    <td class="ic"><span class="badge"><svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></span></td>
+                    <td><span class="tool-name">Switch base map</span> — cycles through aerial / street views.</td>
+                </tr>
+                <tr>
+                    <td class="ic"><span class="badge"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg></span></td>
+                    <td><span class="tool-name">Parcels</span> — turns the parcel overlay on / off.</td>
+                </tr>
+                <tr>
+                    <td class="ic"><span class="badge"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span></td>
+                    <td><span class="tool-name">Help</span> — opens the in-map version of this guide.</td>
+                </tr>
+            </table>
+        </section>
+
+        <section>
+            <h2>Turning on the parcel overlay</h2>
+            <ol>
+                <li>Tap the <strong>Parcels</strong> button (the grid of squares). It highlights to show it's active.</li>
+                <li><strong>Zoom in</strong> until you're close enough — parcels only draw once you're zoomed in to street level. If you're too far out, the corner reads <em>"Zoom in to see parcels."</em></li>
+                <li>Parcel outlines appear. <strong>Tap any parcel</strong> to see its details (owner, value, size, etc.).</li>
+            </ol>
+            <div class="tip">💡 The button briefly shows a spinning icon while parcels load.</div>
+        </section>
+
+        <section>
+            <h2>The two icons that appear after activation</h2>
+            <p>Once the overlay is on, <strong>two more buttons unhide</strong> below it. Turn the overlay off and they hide again.</p>
+            <table>
+                <tr>
+                    <td class="ic"><span class="badge"><svg viewBox="0 0 24 24"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg></span></td>
+                    <td><span class="tool-name">Value Compare</span> (scale)</td>
+                </tr>
+                <tr>
+                    <td class="ic"><span class="badge"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span></td>
+                    <td><span class="tool-name">Show Values</span> (dollar)</td>
+                </tr>
+            </table>
+
+            <h3>Show Values</h3>
+            <p>Tap it to stamp <strong>every visible parcel</strong> with its total value (and $/sqft where available). Tap again to clear the labels.</p>
+
+            <h3>Value Compare — this one is a two-step tool</h3>
+            <p>Value Compare colors nearby parcels by how their value compares to <strong>one parcel you pick</strong>. The second step is easy to miss:</p>
+            <ol>
+                <li><span class="step-tag">1</span><strong>Tap the scale button to activate it.</strong> It highlights, and a small options panel appears at the top.</li>
+                <li><span class="step-tag">2</span><strong>Now tap the parcel you want to compare against.</strong> This is the step people forget — activating the tool does nothing on its own; you must then click a parcel to set it as the baseline.</li>
+                <li><span class="step-tag">3</span>Surrounding parcels recolor by value difference vs. your pick, each labeled with the +/− amount. Your baseline parcel is highlighted.</li>
+            </ol>
+
+            <div class="callout">
+                <strong>Compare a different parcel?</strong> Tapping another parcel now just opens its detail popup and shows the price difference — it does <em>not</em> change the baseline. To pick a new baseline, toggle the scale button off and back on, then tap the new parcel.
+            </div>
+
+            <p><strong>Options panel (top of screen):</strong></p>
+            <ul>
+                <li><strong>Entire street</strong> vs. <strong>All visible parcels</strong> — choose which parcels to compare.</li>
+                <li><strong>Total value</strong> vs. <strong>$/sqft</strong> — choose the metric. Switching is instant; no re-clicking needed.</li>
+            </ul>
+            <p>Tap the scale button again to turn Value Compare off.</p>
+        </section>
+
+        <section class="tldr">
+            <h2>In short</h2>
+            <p style="margin:0;"><strong>Parcels</strong> → zoom in → tap a parcel for info.<br>
+            For <strong>Value Compare</strong>: <strong>activate first, then click your baseline parcel.</strong></p>
+        </section>
+    </div>
+</body>
+
+</html>
