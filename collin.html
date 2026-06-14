@@ -516,6 +516,7 @@
                 btn.classList.remove('btn-loading');
                 btn.innerHTML = ICONS.parcels;
                 refreshValueLabels();
+                refreshCompareOverlay();
             });
 
             parcelLayer.on('requesterror', () => {
@@ -568,6 +569,9 @@
 
         function runValueCompare(props, layer) {
             if (!parcelLayer) return;
+            // Capture the baseline geometry as GeoJSON so its highlight can be
+            // redrawn on pan/zoom even after the live parcel layer drops it.
+            const selectedFeature = layer.toGeoJSON();
 
             const selectedId = f(props, 'prop_id');
             const features = [];
@@ -576,7 +580,7 @@
                 features.push(l.toGeoJSON());
             });
 
-            buildCompareOverlay(props, { type: 'FeatureCollection', features }, layer);
+            buildCompareOverlay(props, { type: 'FeatureCollection', features }, selectedFeature);
         }
 
         // Color intensity reflects |delta| as a percentage of the selected
@@ -601,26 +605,24 @@
             lastCompare = null;
         }
 
-        function addBaselineHighlight(selectedProps, selectedLayer) {
-            const highlight = L.polygon(selectedLayer.getLatLngs(), {
-                color: '#FFD700',
-                weight: 3,
-                fillOpacity: 0,
-                interactive: false
+        function addBaselineHighlight(selectedProps, selectedFeature) {
+            const highlight = L.geoJSON(selectedFeature, {
+                interactive: false,
+                style: { color: '#FFD700', weight: 3, fillOpacity: 0 }
             });
             compareLayerGroup.addLayer(highlight);
 
             const value = getMetricValue(selectedProps);
-            const label = L.marker(selectedLayer.getBounds().getCenter(), {
+            const label = L.marker(highlight.getBounds().getCenter(), {
                 icon: L.divIcon({ className: 'vc-baseline-label', html: fmtMetricValue(value), iconSize: null }),
                 interactive: false
             });
             compareLayerGroup.addLayer(label);
         }
 
-        function buildCompareOverlay(selectedProps, featureCollection, selectedLayer) {
+        function buildCompareOverlay(selectedProps, featureCollection, selectedFeature) {
             clearCompareOverlay();
-            lastCompare = { selectedProps, featureCollection, selectedLayer };
+            lastCompare = { selectedProps, featureCollection, selectedFeature };
 
             const selectedValue = getMetricValue(selectedProps);
 
@@ -647,9 +649,26 @@
             });
             compareLayerGroup.addLayer(neighborLayer);
 
-            addBaselineHighlight(selectedProps, selectedLayer);
+            addBaselineHighlight(selectedProps, selectedFeature);
 
             compareLayerGroup.addTo(map);
+        }
+
+        // Rebuild the comparison whenever new parcels load (pan/zoom) so freshly
+        // revealed parcels get colored and labeled against the same baseline
+        // instead of staying blank.
+        function refreshCompareOverlay() {
+            if (!valueCompareActive || !lastCompare || !parcelLayer) return;
+
+            const baselineProps = lastCompare.selectedProps;
+            const baselineFeature = lastCompare.selectedFeature;
+            const selectedId = f(baselineProps, 'prop_id');
+            const features = [];
+            parcelLayer.eachActiveFeature((l) => {
+                if (f(l.feature.properties, 'prop_id') === selectedId) return;
+                features.push(l.toGeoJSON());
+            });
+            buildCompareOverlay(baselineProps, { type: 'FeatureCollection', features }, baselineFeature);
         }
 
         function toggleValueCompare() {
@@ -673,7 +692,7 @@
             if (compareMetric === metric) return;
             compareMetric = metric;
             if (lastCompare) {
-                buildCompareOverlay(lastCompare.selectedProps, lastCompare.featureCollection, lastCompare.selectedLayer);
+                buildCompareOverlay(lastCompare.selectedProps, lastCompare.featureCollection, lastCompare.selectedFeature);
             }
         }
 
