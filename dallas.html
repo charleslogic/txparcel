@@ -275,6 +275,18 @@
         let isOverlayActive = false;
         let valueCompareActive = false;
         let compareLayerGroup = null;
+
+        // The value-compare card is a body-level overlay that stacks above the
+        // whole map, so it covers an open popup's close button. Hide it while a
+        // popup is open and restore it (if still applicable) when it closes.
+        map.on('popupopen', () => {
+            document.getElementById('vc-mode-wrap').style.display = 'none';
+        });
+        map.on('popupclose', () => {
+            if (isOverlayActive && valueCompareActive) {
+                document.getElementById('vc-mode-wrap').style.display = 'flex';
+            }
+        });
         let compareMetric = 'total'; // 'total' | 'persqft'
         let lastCompare = null;      // remembers the active comparison so the metric toggle can rebuild it
         let showValuesActive = false;
